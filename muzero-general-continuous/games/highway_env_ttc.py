@@ -18,7 +18,7 @@ class MuZeroConfig:
 
 
         ### Game
-        self.observation_shape = (1, 1, 147)  # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
+        self.observation_shape = (1, 21, 7)  # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
         self.action_space = 2  # Number of dimensions in the action space
         self.players = [i for i in range(1)]  # List of players. You should only edit the length
         self.stacked_observations = 0  # Number of previous observations and previous actions to add to the current observation
@@ -43,7 +43,7 @@ class MuZeroConfig:
         self.root_exploration_fraction = 0.2
 
         # UCB formula
-        self.pb_c_base = 19000
+        self.pb_c_base = 19652
         self.pb_c_init = 1.25
 
         # Progressive widening parameter
@@ -55,26 +55,26 @@ class MuZeroConfig:
         
         # Residual Network
         self.downsample = "resnet" # Downsample observations before representation network, False / "CNN" (lighter) / "resnet" (See paper appendix Network Architecture)
-        self.blocks = 16  # Number of blocks in the ResNet
-        self.channels = 256  # Number of channels in the ResNet
+        self.blocks = 8  # Number of blocks in the ResNet
+        self.channels = 128  # Number of channels in the ResNet
         # Define channels for each head
-        self.reduced_channels_reward = 256  # Number of channels in reward head
-        self.reduced_channels_value = 256  # Number of channels in value head
-        self.reduced_channels_policy = 256  # Number of channels in policy head
+        self.reduced_channels_reward = 128  # Number of channels in reward head
+        self.reduced_channels_value = 128  # Number of channels in value head
+        self.reduced_channels_policy = 128  # Number of channels in policy head
 
         # Define hidden layers (example)
-        self.resnet_fc_reward_layers = [256, 256]  # Hidden layers for reward head
-        self.resnet_fc_value_layers = [256, 256]  # Hidden layers for value head
-        self.resnet_fc_policy_layers = [256, 256]
+        self.resnet_fc_reward_layers = [128, 128]  # Hidden layers for reward head
+        self.resnet_fc_value_layers = [128, 128]  # Hidden layers for value head
+        self.resnet_fc_policy_layers = [128, 128]
         # Hidden layers for policy head # Define the hidden layers in the policy head of the prediction network
         # self.resnet_fc_reconstruction_layers = [32]  # Define the hidden layers in the reconstruction head of the reconstruction network
 
         # Fully Connected Network
         self.encoding_size = 40
-        self.fc_representation_layers = [256, 256]  # Define the hidden layers in the representation network
-        self.fc_dynamics_layers = [256, 256]  # Define the hidden layers in the dynamics network
-        self.fc_reward_layers = [256, 256]  # Define the hidden layers in the reward network
-        self.fc_value_layers = [512, 512]  # Define the hidden layers in the value network
+        self.fc_representation_layers = [128, 128]  # Define the hidden layers in the representation network
+        self.fc_dynamics_layers = [128, 128]  # Define the hidden layers in the dynamics network
+        self.fc_reward_layers = [128, 128]  # Define the hidden layers in the reward network
+        self.fc_value_layers = [128, 128]  # Define the hidden layers in the value network
         self.fc_mu_policy_layers = [128, 128]  # Define the hidden layers in the policy network
         self.fc_log_std_policy_layers = [128, 128]  # Define the hidden layers in the policy network
 
@@ -84,17 +84,17 @@ class MuZeroConfig:
         self.training_steps = 20000  # Total number of training steps (ie weights update according to a batch)
         self.batch_size = 512 # Number of parts of games to train on at each training step
         self.checkpoint_interval = 10  # Number of training steps before using the model for self-playing
-        self.value_loss_weight = 0.2  # Scale the value loss to avoid overfitting of the value function, paper recommends 0.25 (See paper appendix Reanalyze)
+        self.value_loss_weight = 1  # Scale the value loss to avoid overfitting of the value function, paper recommends 0.25 (See paper appendix Reanalyze)
         self.entropy_loss_weight = 0.15  # Scale the entropy loss
         self.log_std_clamp = (-20, 2)  # Clamp the standard deviation
         self.train_on_gpu = torch.cuda.is_available()  # Train on GPU if available
 
-        self.optimizer = "Adam"  # "Adam" or "SGD". Paper uses SGD
+        self.optimizer = "AdamW"  # "Adam" or "SGD". Paper uses SGD
         self.weight_decay = 1e-4  # L2 weights regularization
         self.momentum = 0.9  # Used only if optimizer is SGD
 
         # Exponential learning rate schedule
-        self.lr_init = 0.0003  # Initial learning rate
+        self.lr_init = 0.0001  # Initial learning rate
         self.lr_decay_rate = 0.9  # Set it to 1 to use a constant learning rate
         self.lr_decay_steps = 5000
 
@@ -159,7 +159,7 @@ class Game(AbstractGame):
                 'centering_position': [0.3, 0.5],  # 初始缩放比例
                 'scaling': 5.5,  # 偏移量
                 'show_trajectories': False,  # 是否记录车辆最近的轨迹并显示
-                'render_agent': False,  # 控制渲染是否应用到屏幕
+                'render_agent': True,  # 控制渲染是否应用到屏幕
                 'offscreen_rendering': False,  # 当前的渲染是否是在屏幕外进行的。如果为False，意味着渲染是在屏幕上进行的，
                 'manual_control': False,  # 是否允许键盘控制观测车辆
                 'real_time_rendering': False,  # 是否实时渲染画面
@@ -195,10 +195,10 @@ class Game(AbstractGame):
         # logger.info(f"start step: {datetime.datetime.now()}")
         action = numpy.tanh(action)
         observation, reward, done, _, _ = self.env.step(action)
-        observation = observation.reshape((147,))
+        # observation = observation.reshape((147,))
 
         # logger.info(f"end step: {datetime.datetime.now()}")
-        return numpy.array([[observation]]), reward, done
+        return numpy.array([observation]), reward, done
 
     def reset(self):
         """
@@ -211,7 +211,7 @@ class Game(AbstractGame):
 
         # Reshape the observation to 3D (1, 1, -1)
         observation = np.array(observation)
-        observation = observation.reshape((1, 1, 147))
+        observation = observation.reshape((1, 21, 7))
         # logger.info(f"Observation2 reset shape after step:{type(observation)}-shape-{observation.shape}")
         return observation
 
