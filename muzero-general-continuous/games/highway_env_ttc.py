@@ -193,7 +193,7 @@ class Game(AbstractGame):
             The new observation, the reward and a boolean if the game has ended.
         """
         # logger.info(f"start step: {datetime.datetime.now()}")
-        # action = numpy.tanh(action)
+        action = numpy.tanh(action)
         observation, reward, done, _, _ = self.env.step(action)
         observation = observation.reshape((147,))
 
