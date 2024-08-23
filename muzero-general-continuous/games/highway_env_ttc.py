@@ -39,15 +39,15 @@ class MuZeroConfig:
         self.node_prior = 'uniform'  # 'uniform' or 'density'
 
         # Root prior exploration noise
-        self.root_dirichlet_alpha = 0.25
-        self.root_exploration_fraction = 0.25
+        self.root_dirichlet_alpha = 0.5
+        self.root_exploration_fraction = 0.5
 
         # UCB formula
-        self.pb_c_base = 19652
+        self.pb_c_base = 19000
         self.pb_c_init = 1.25
 
         # Progressive widening parameter
-        self.pw_alpha = 0.49
+        self.pw_alpha = 0.4
 
         ### Network
         self.network = "fullyconnected"  # "resnet" / "fullyconnected"
@@ -95,17 +95,17 @@ class MuZeroConfig:
 
         # Exponential learning rate schedule
         self.lr_init = 0.0003  # Initial learning rate
-        self.lr_decay_rate = 0.8  # Set it to 1 to use a constant learning rate
+        self.lr_decay_rate = 0.9  # Set it to 1 to use a constant learning rate
         self.lr_decay_steps = 5000
 
 
 
         ### Replay Buffer
-        self.replay_buffer_size = 4000  # Number of self-play games to keep in the replay buffer
-        self.num_unroll_steps = 10  # Number of game moves to keep for every batch element
-        self.td_steps = 50  # Number of steps in the future to take into account for calculating the target value
+        self.replay_buffer_size = 5000  # Number of self-play games to keep in the replay buffer
+        self.num_unroll_steps = 15  # Number of game moves to keep for every batch element
+        self.td_steps = 35  # Number of steps in the future to take into account for calculating the target value
         self.PER = True  # Prioritized Replay (See paper appendix Training), select in priority the elements in the replay buffer which are unexpected for the network
-        self.PER_alpha = 0.35 # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
+        self.PER_alpha = 0.6 # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
 
         # Reanalyze (See paper appendix Reanalyse)
         self.use_last_model_value = True  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
