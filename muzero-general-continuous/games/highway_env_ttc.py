@@ -39,8 +39,8 @@ class MuZeroConfig:
         self.node_prior = 'uniform'  # 'uniform' or 'density'
 
         # Root prior exploration noise
-        self.root_dirichlet_alpha = 0.5
-        self.root_exploration_fraction = 0.5
+        self.root_dirichlet_alpha = 0.2
+        self.root_exploration_fraction = 0.2
 
         # UCB formula
         self.pb_c_base = 19000
@@ -82,10 +82,10 @@ class MuZeroConfig:
         self.results_path = pathlib.Path(__file__).resolve().parents[1] / "results" / pathlib.Path(__file__).stem / datetime.datetime.now().strftime("%Y-%m-%d--%H-%M-%S")  # Path to store the model weights and TensorBoard logs
         self.save_model = True  # Save the checkpoint in results_path as model.checkpoint
         self.training_steps = 20000  # Total number of training steps (ie weights update according to a batch)
-        self.batch_size = 256 # Number of parts of games to train on at each training step
+        self.batch_size = 512 # Number of parts of games to train on at each training step
         self.checkpoint_interval = 10  # Number of training steps before using the model for self-playing
-        self.value_loss_weight = 0.25  # Scale the value loss to avoid overfitting of the value function, paper recommends 0.25 (See paper appendix Reanalyze)
-        self.entropy_loss_weight = 0.1  # Scale the entropy loss
+        self.value_loss_weight = 0.2  # Scale the value loss to avoid overfitting of the value function, paper recommends 0.25 (See paper appendix Reanalyze)
+        self.entropy_loss_weight = 0.15  # Scale the entropy loss
         self.log_std_clamp = (-20, 2)  # Clamp the standard deviation
         self.train_on_gpu = torch.cuda.is_available()  # Train on GPU if available
 
@@ -103,7 +103,7 @@ class MuZeroConfig:
         ### Replay Buffer
         self.replay_buffer_size = 5000  # Number of self-play games to keep in the replay buffer
         self.num_unroll_steps = 15  # Number of game moves to keep for every batch element
-        self.td_steps = 35  # Number of steps in the future to take into account for calculating the target value
+        self.td_steps = 60  # Number of steps in the future to take into account for calculating the target value
         self.PER = True  # Prioritized Replay (See paper appendix Training), select in priority the elements in the replay buffer which are unexpected for the network
         self.PER_alpha = 0.6 # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
 
