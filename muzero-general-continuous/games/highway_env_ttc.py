@@ -31,7 +31,7 @@ class MuZeroConfig:
 
         ### Self-Play
         self.num_workers = 6  # Number of simultaneous threads self-playing to feed the replay buffer
-        self.selfplay_on_gpu = True  # 启用渲染需要把它打开
+        self.selfplay_on_gpu = False  # 启用渲染需要把它打开
         self.max_moves = 1000  # Maximum number of moves if game is not finished before
         self.num_simulations = 35  # Number of future moves self-simulated
         self.discount = 0.975  # Chronological discount of the reward
@@ -54,27 +54,27 @@ class MuZeroConfig:
         self.support_size = 10  # Value and reward are scaled (with almost sqrt) and encoded on a vector with a range of -support_size to support_size
         
         # Residual Network
-        self.downsample = False  # Downsample observations before representation network, False / "CNN" (lighter) / "resnet" (See paper appendix Network Architecture)
-        self.blocks = 1  # Number of blocks in the ResNet
-        self.channels = 2  # Number of channels in the ResNet
+        self.downsample = "resnet" # Downsample observations before representation network, False / "CNN" (lighter) / "resnet" (See paper appendix Network Architecture)
+        self.blocks = 16  # Number of blocks in the ResNet
+        self.channels = 256  # Number of channels in the ResNet
         # Define channels for each head
-        self.reduced_channels_reward = 2  # Number of channels in reward head
-        self.reduced_channels_value = 2  # Number of channels in value head
-        self.reduced_channels_policy = 2  # Number of channels in policy head
+        self.reduced_channels_reward = 256  # Number of channels in reward head
+        self.reduced_channels_value = 256  # Number of channels in value head
+        self.reduced_channels_policy = 256  # Number of channels in policy head
 
         # Define hidden layers (example)
-        self.resnet_fc_reward_layers = []  # Hidden layers for reward head
-        self.resnet_fc_value_layers = []  # Hidden layers for value head
-        self.resnet_fc_policy_layers = []
+        self.resnet_fc_reward_layers = [256, 256]  # Hidden layers for reward head
+        self.resnet_fc_value_layers = [256, 256]  # Hidden layers for value head
+        self.resnet_fc_policy_layers = [256, 256]
         # Hidden layers for policy head # Define the hidden layers in the policy head of the prediction network
         # self.resnet_fc_reconstruction_layers = [32]  # Define the hidden layers in the reconstruction head of the reconstruction network
 
         # Fully Connected Network
-        self.encoding_size = 128
-        self.fc_representation_layers = [128]  # Define the hidden layers in the representation network
-        self.fc_dynamics_layers = [128, 128]  # Define the hidden layers in the dynamics network
-        self.fc_reward_layers = [128, 128]  # Define the hidden layers in the reward network
-        self.fc_value_layers = [128, 128]  # Define the hidden layers in the value network
+        self.encoding_size = 40
+        self.fc_representation_layers = [256, 256]  # Define the hidden layers in the representation network
+        self.fc_dynamics_layers = [256, 256]  # Define the hidden layers in the dynamics network
+        self.fc_reward_layers = [256, 256]  # Define the hidden layers in the reward network
+        self.fc_value_layers = [512, 512]  # Define the hidden layers in the value network
         self.fc_mu_policy_layers = [128, 128]  # Define the hidden layers in the policy network
         self.fc_log_std_policy_layers = [128, 128]  # Define the hidden layers in the policy network
 
@@ -82,9 +82,9 @@ class MuZeroConfig:
         self.results_path = pathlib.Path(__file__).resolve().parents[1] / "results" / pathlib.Path(__file__).stem / datetime.datetime.now().strftime("%Y-%m-%d--%H-%M-%S")  # Path to store the model weights and TensorBoard logs
         self.save_model = True  # Save the checkpoint in results_path as model.checkpoint
         self.training_steps = 20000  # Total number of training steps (ie weights update according to a batch)
-        self.batch_size = 512 # Number of parts of games to train on at each training step
+        self.batch_size = 256 # Number of parts of games to train on at each training step
         self.checkpoint_interval = 10  # Number of training steps before using the model for self-playing
-        self.value_loss_weight = 1  # Scale the value loss to avoid overfitting of the value function, paper recommends 0.25 (See paper appendix Reanalyze)
+        self.value_loss_weight = 0.25  # Scale the value loss to avoid overfitting of the value function, paper recommends 0.25 (See paper appendix Reanalyze)
         self.entropy_loss_weight = 0.1  # Scale the entropy loss
         self.log_std_clamp = (-20, 2)  # Clamp the standard deviation
         self.train_on_gpu = torch.cuda.is_available()  # Train on GPU if available
