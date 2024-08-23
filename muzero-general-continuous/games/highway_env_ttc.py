@@ -1,5 +1,6 @@
 import datetime
 import pathlib
+import time
 
 import gymnasium as gym
 import numpy
@@ -30,7 +31,7 @@ class MuZeroConfig:
 
         ### Self-Play
         self.num_workers = 6  # Number of simultaneous threads self-playing to feed the replay buffer
-        self.selfplay_on_gpu = False
+        self.selfplay_on_gpu = True  # 启用渲染需要把它打开
         self.max_moves = 1000  # Maximum number of moves if game is not finished before
         self.num_simulations = 35  # Number of future moves self-simulated
         self.discount = 0.975  # Chronological discount of the reward
@@ -140,7 +141,7 @@ class Game(AbstractGame):
     """
 
     def __init__(self, seed=None):
-        self.env = gym.make('highway-v0', config={    # 需要在程序启动这个观测器之前使用自定义的公式来对观测车辆的初始速度和初始位置进行初始化
+        self.env = gym.make('highway-v0', render_mode="rgb_array", config={    # 需要在程序启动这个观测器之前使用自定义的公式来对观测车辆的初始速度和初始位置进行初始化
                 'observation': {"type": "Kinematics",  # 使用这个观测器作为状态空间，可以获取观测车辆位置、观测车辆速度和观测车辆转向角
                                 "vehicles_count": 21,  # 20辆周围车辆
                                 "features": ["presence", "x", "y", "vx", "vy", "cos_h", "sin_h"],  # 控制状态空间包括转向角
@@ -157,7 +158,7 @@ class Game(AbstractGame):
                 'screen_height': 150,  # 屏幕高度
                 'centering_position': [0.3, 0.5],  # 初始缩放比例
                 'scaling': 5.5,  # 偏移量
-                'show_trajectories': False,  # 是否记录车辆最近的轨迹并显示
+                'show_trajectories': True,  # 是否记录车辆最近的轨迹并显示
                 'render_agent': True,  # 控制渲染是否应用到屏幕
                 'offscreen_rendering': False,  # 当前的渲染是否是在屏幕外进行的。如果为False，意味着渲染是在屏幕上进行的，
                 'manual_control': False,  # 是否允许键盘控制观测车辆
@@ -218,7 +219,7 @@ class Game(AbstractGame):
         """
         Display the game observation.
         """
-        # logger.info(f"start render step: {datetime.datetime.now()}")
+        logger.info(f"start render step: {datetime.datetime.now()}")
         self.env.render()
-        # logger.info(f"end render step: {datetime.datetime.now()}")
-        # input("Press enter to take a step ")
+        logger.info(f"end render step: {datetime.datetime.now()}")
+        time.sleep(3)

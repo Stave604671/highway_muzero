@@ -667,7 +667,7 @@ if __name__ == "__main__":
             elif choice == 1:
                 load_model_menu(muzero, game_name)
             elif choice == 2:
-                muzero.test(render=False, opponent="self", muzero_player=None)
+                muzero.test(render=True, opponent="self", muzero_player=None)
             elif choice == 3:
                 muzero.test(render=False, opponent="human", muzero_player=0)
             elif choice == 4:
