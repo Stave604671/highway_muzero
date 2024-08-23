@@ -30,7 +30,7 @@ class MuZeroConfig:
 
 
         ### Self-Play
-        self.num_workers = 6  # Number of simultaneous threads self-playing to feed the replay buffer
+        self.num_workers = 3  # Number of simultaneous threads self-playing to feed the replay buffer
         self.selfplay_on_gpu = False  # 启用渲染需要把它打开
         self.max_moves = 1000  # Maximum number of moves if game is not finished before
         self.num_simulations = 35  # Number of future moves self-simulated
@@ -158,8 +158,8 @@ class Game(AbstractGame):
                 'screen_height': 150,  # 屏幕高度
                 'centering_position': [0.3, 0.5],  # 初始缩放比例
                 'scaling': 5.5,  # 偏移量
-                'show_trajectories': True,  # 是否记录车辆最近的轨迹并显示
-                'render_agent': True,  # 控制渲染是否应用到屏幕
+                'show_trajectories': False,  # 是否记录车辆最近的轨迹并显示
+                'render_agent': False,  # 控制渲染是否应用到屏幕
                 'offscreen_rendering': False,  # 当前的渲染是否是在屏幕外进行的。如果为False，意味着渲染是在屏幕上进行的，
                 'manual_control': False,  # 是否允许键盘控制观测车辆
                 'real_time_rendering': False,  # 是否实时渲染画面
