@@ -34,7 +34,7 @@ class MuZeroConfig:
         self.selfplay_on_gpu = False  # 启用渲染需要把它打开
         self.max_moves = 1000  # Maximum number of moves if game is not finished before
         self.num_simulations = 35  # Number of future moves self-simulated
-        self.discount = 0.975  # Chronological discount of the reward
+        self.discount = 0.95  # Chronological discount of the reward
         self.temperature_threshold = None  # Number of moves before dropping temperature to 0 (ie playing according to the max)
         self.node_prior = 'uniform'  # 'uniform' or 'density'
 
@@ -51,11 +51,11 @@ class MuZeroConfig:
 
         ### Network
         self.network = "fullyconnected"  # "resnet" / "fullyconnected"
-        self.support_size = 10  # Value and reward are scaled (with almost sqrt) and encoded on a vector with a range of -support_size to support_size
+        self.support_size = 20  # Value and reward are scaled (with almost sqrt) and encoded on a vector with a range of -support_size to support_size
         
         # Residual Network
         self.downsample = "resnet" # Downsample observations before representation network, False / "CNN" (lighter) / "resnet" (See paper appendix Network Architecture)
-        self.blocks = 8  # Number of blocks in the ResNet
+        self.blocks = 6  # Number of blocks in the ResNet
         self.channels = 128  # Number of channels in the ResNet
         # Define channels for each head
         self.reduced_channels_reward = 128  # Number of channels in reward head
@@ -94,8 +94,8 @@ class MuZeroConfig:
         self.momentum = 0.9  # Used only if optimizer is SGD
 
         # Exponential learning rate schedule
-        self.lr_init = 0.0001  # Initial learning rate
-        self.lr_decay_rate = 0.9  # Set it to 1 to use a constant learning rate
+        self.lr_init = 0.0005  # Initial learning rate
+        self.lr_decay_rate = 0.95  # Set it to 1 to use a constant learning rate
         self.lr_decay_steps = 5000
 
 
@@ -103,9 +103,9 @@ class MuZeroConfig:
         ### Replay Buffer
         self.replay_buffer_size = 5000  # Number of self-play games to keep in the replay buffer
         self.num_unroll_steps = 15  # Number of game moves to keep for every batch element
-        self.td_steps = 60  # Number of steps in the future to take into account for calculating the target value
+        self.td_steps = 50  # Number of steps in the future to take into account for calculating the target value
         self.PER = True  # Prioritized Replay (See paper appendix Training), select in priority the elements in the replay buffer which are unexpected for the network
-        self.PER_alpha = 0.6 # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
+        self.PER_alpha = 0.7 # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
 
         # Reanalyze (See paper appendix Reanalyse)
         self.use_last_model_value = True  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
@@ -150,7 +150,7 @@ class Game(AbstractGame):
                                 },
                 'action': {'type': 'ContinuousAction',
                            'acceleration_range': (-4, 4.0)},  # 为它扩展一个能够控制横向加速度和纵向加速度的子类
-                'simulation_frequency': 35,  # 模拟频率
+                'simulation_frequency': 5,  # 模拟频率
                 'policy_frequency': 5,  # 策略频率
                 # 纵向决策：IDM（智能驾驶模型）根据前车的距离和速度计算出加速度。
                 'other_vehicles_type': 'highway_env.vehicle.behavior.IDMVehicle',
@@ -167,14 +167,14 @@ class Game(AbstractGame):
                 # 'normalize_reward': True,
                 'controlled_vehicles': 1,  # 一次只控制一辆车
                 'initial_lane_id': None,  # 控制观测车辆在哪一条车道初始化
-                'duration': 60,  # 限制了仿真的时间长度
-                'ego_spacing': 2,  # 表示控制车辆（ego vehicle）与前一辆车之间的初始间隔距离。它用来设置在创建控制车辆时的车间距
+                'duration': 30,  # 限制了仿真的时间长度
+                'ego_spacing': 1.5,  # 表示控制车辆（ego vehicle）与前一辆车之间的初始间隔距离。它用来设置在创建控制车辆时的车间距
                 'vehicles_density': 1,
-                "right_lane_reward": 0.1,  # 在最右边的车道上行驶时获得的奖励，在其他车道上线性映射为零。
-                'collision_reward': -1.0,  # 与车辆相撞时获取的奖励
-                'on_road_reward': 1.0,
-                'high_speed_reward': 0.5,
-                'lane_change_reward': -0.05,
+                "right_lane_reward": 2,  # 在最右边的车道上行驶时获得的奖励，在其他车道上线性映射为零。
+                'collision_reward': -5,  # 与车辆相撞时获取的奖励
+                'on_road_reward': 5,
+                # 'high_speed_reward': 0.4,
+                'lane_change_reward': -1,
                 'reward_speed_range': [20, 30],  # 高速的奖励从这个范围线性映射到[0,HighwayEnv.HIGH_SPEED_REWARD]。
                 'offroad_terminal': True  # 车辆偏离道路是否会导致仿真结束
             })
