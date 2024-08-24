@@ -34,7 +34,7 @@ class MuZeroConfig:
         self.selfplay_on_gpu = False  # 启用渲染需要把它打开
         self.max_moves = 1000  # Maximum number of moves if game is not finished before
         self.num_simulations = 35  # Number of future moves self-simulated
-        self.discount = 0.975  # Chronological discount of the reward
+        self.discount = 0.95  # Chronological discount of the reward
         self.temperature_threshold = None  # Number of moves before dropping temperature to 0 (ie playing according to the max)
         self.node_prior = 'uniform'  # 'uniform' or 'density'
 
@@ -85,7 +85,7 @@ class MuZeroConfig:
         self.batch_size = 512 # Number of parts of games to train on at each training step
         self.checkpoint_interval = 10  # Number of training steps before using the model for self-playing
         self.value_loss_weight = 1  # Scale the value loss to avoid overfitting of the value function, paper recommends 0.25 (See paper appendix Reanalyze)
-        self.entropy_loss_weight = 0.1  # Scale the entropy loss
+        self.entropy_loss_weight = 0.15  # Scale the entropy loss
         self.log_std_clamp = (-20, 2)  # Clamp the standard deviation
         self.train_on_gpu = torch.cuda.is_available()  # Train on GPU if available
 
@@ -94,18 +94,18 @@ class MuZeroConfig:
         self.momentum = 0.9  # Used only if optimizer is SGD
 
         # Exponential learning rate schedule
-        self.lr_init = 0.0001  # Initial learning rate
+        self.lr_init = 0.0005  # Initial learning rate
         self.lr_decay_rate = 0.95  # Set it to 1 to use a constant learning rate
         self.lr_decay_steps = 5000
 
 
 
         ### Replay Buffer
-        self.replay_buffer_size = 6000  # Number of self-play games to keep in the replay buffer
+        self.replay_buffer_size = 7500  # Number of self-play games to keep in the replay buffer
         self.num_unroll_steps = 15  # Number of game moves to keep for every batch element
-        self.td_steps = 35  # Number of steps in the future to take into account for calculating the target value
+        self.td_steps = 50  # Number of steps in the future to take into account for calculating the target value
         self.PER = True  # Prioritized Replay (See paper appendix Training), select in priority the elements in the replay buffer which are unexpected for the network
-        self.PER_alpha = 0.8 # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
+        self.PER_alpha = 0.7 # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
 
         # Reanalyze (See paper appendix Reanalyse)
         self.use_last_model_value = True  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
@@ -170,11 +170,11 @@ class Game(AbstractGame):
                 'duration': 30,  # 限制了仿真的时间长度
                 'ego_spacing': 1.5,  # 表示控制车辆（ego vehicle）与前一辆车之间的初始间隔距离。它用来设置在创建控制车辆时的车间距
                 'vehicles_density': 1,
-                "right_lane_reward": 0.7,  # 在最右边的车道上行驶时获得的奖励，在其他车道上线性映射为零。
+                "right_lane_reward": 1,  # 在最右边的车道上行驶时获得的奖励，在其他车道上线性映射为零。
                 'collision_reward': -3,  # 与车辆相撞时获取的奖励
                 'on_road_reward': 3,
                 'high_speed_reward': 3,
-                'lane_change_reward': -0.25,
+                'lane_change_reward': -1,
                 'reward_speed_range': [20, 30],  # 高速的奖励从这个范围线性映射到[0,HighwayEnv.HIGH_SPEED_REWARD]。
                 'offroad_terminal': True  # 车辆偏离道路是否会导致仿真结束
             })

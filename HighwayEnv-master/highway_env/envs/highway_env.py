@@ -109,7 +109,7 @@ class HighwayEnv(AbstractEnv):
                 reward,
                 [
                     self.config["collision_reward"],
-                    sum(self.config.get(name, 0) for name in rewards.keys()),
+                    self.config["high_speed_reward"]+self.config["right_lane_reward"]+self.config["lane_change_reward"],
                 ],
                 [0, 1],
             )
