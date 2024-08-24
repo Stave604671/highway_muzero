@@ -103,13 +103,13 @@ class HighwayEnv(AbstractEnv):
         reward = sum(
             self.config.get(name, 0) * reward for name, reward in rewards.items()
         )
-        reward = np.tanh(reward)
+        reward = np.clip(reward, -1, 1)
         if self.config["normalize_reward"]:
             reward = utils.lmap(
                 reward,
                 [
                     self.config["collision_reward"],
-                    self.config["high_speed_reward"]+self.config["right_lane_reward"]+self.config["lane_change_reward"],
+                    sum(self.config.get(name, 0) for name in rewards.keys()),
                 ],
                 [0, 1],
             )
@@ -139,7 +139,7 @@ class HighwayEnv(AbstractEnv):
         # logger.info(f"{self.vehicle.lane_index}-value3-{type(self.vehicle.lane_index)}")
         self.vehicle.last_lane_index = self.vehicle.lane_index[2]
         return {
-            "collision_reward": float(self.vehicle.crashed),
+            "collision_reward": float(self.vehicle.crashed) * self.config["collision_reward"],
             "right_lane_reward": lane / max(len(neighbours) - 1, 1),
             "high_speed_reward": high_speed_reward,
             "lane_change_reward": lane_change_reward,
