@@ -67,12 +67,7 @@ def finite_mdp(
 
     state_reward = np.ravel(state_reward)
     action_reward = [
-        env.config["lane_change_reward"],
-        0,
-        env.config["lane_change_reward"],
-        0,
-        0,
-    ]
+        env.config["lane_change_reward"], 0, env.config["lane_change_reward"], 0, 0,]
     reward = np.fromfunction(
         np.vectorize(lambda s, a: state_reward[s] + action_reward[a]),
         (np.size(state_reward), np.size(action_reward)),

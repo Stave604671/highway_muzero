@@ -18,7 +18,7 @@ class MuZeroConfig:
 
 
         ### Game
-        self.observation_shape = (1, 1, 147)  # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
+        self.observation_shape = (1,1,147) # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
         self.action_space = 2  # Number of dimensions in the action space
         self.players = [i for i in range(1)]  # List of players. You should only edit the length
         self.stacked_observations = 0  # Number of previous observations and previous actions to add to the current observation
@@ -31,7 +31,7 @@ class MuZeroConfig:
 
         ### Self-Play
         self.num_workers = 6  # Number of simultaneous threads self-playing to feed the replay buffer
-        self.selfplay_on_gpu = True  # 启用渲染需要把它打开
+        self.selfplay_on_gpu = True
         self.max_moves = 1000  # Maximum number of moves if game is not finished before
         self.num_simulations = 35  # Number of future moves self-simulated
         self.discount = 0.975  # Chronological discount of the reward
