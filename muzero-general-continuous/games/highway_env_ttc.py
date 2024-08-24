@@ -34,7 +34,7 @@ class MuZeroConfig:
         self.selfplay_on_gpu = False  # 启用渲染需要把它打开
         self.max_moves = 1000  # Maximum number of moves if game is not finished before
         self.num_simulations = 35  # Number of future moves self-simulated
-        self.discount = 0.95  # Chronological discount of the reward
+        self.discount = 0.975  # Chronological discount of the reward
         self.temperature_threshold = None  # Number of moves before dropping temperature to 0 (ie playing according to the max)
         self.node_prior = 'uniform'  # 'uniform' or 'density'
 
@@ -103,9 +103,9 @@ class MuZeroConfig:
         ### Replay Buffer
         self.replay_buffer_size = 6000  # Number of self-play games to keep in the replay buffer
         self.num_unroll_steps = 15  # Number of game moves to keep for every batch element
-        self.td_steps = 50  # Number of steps in the future to take into account for calculating the target value
+        self.td_steps = 35  # Number of steps in the future to take into account for calculating the target value
         self.PER = True  # Prioritized Replay (See paper appendix Training), select in priority the elements in the replay buffer which are unexpected for the network
-        self.PER_alpha = 0.7 # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
+        self.PER_alpha = 0.8 # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
 
         # Reanalyze (See paper appendix Reanalyse)
         self.use_last_model_value = True  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
