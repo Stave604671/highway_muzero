@@ -99,6 +99,7 @@ class HighwayEnv(AbstractEnv):
         :param action: the last action performed
         :return: the corresponding reward
         """
+
         rewards = self._rewards(action)
         reward = sum(
             self.config.get(name, 0) * reward for name, reward in rewards.items()
@@ -137,6 +138,7 @@ class HighwayEnv(AbstractEnv):
         # 更新last_lane_index
         # logger.info(f"{self.vehicle.lane_index}-value3-{type(self.vehicle.lane_index)}")
         self.vehicle.last_lane_index = self.vehicle.lane_index[2]
+        #返回奖励字典
         return {
             "collision_reward": float(self.vehicle.crashed),
             "right_lane_reward": lane / max(len(neighbours) - 1, 1),
