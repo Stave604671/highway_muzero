@@ -39,8 +39,8 @@ class MuZeroConfig:
         self.node_prior = 'uniform'  # 'uniform' or 'density'
 
         # Root prior exploration noise
-        self.root_dirichlet_alpha = 0.15
-        self.root_exploration_fraction = 0.15
+        self.root_dirichlet_alpha = 0.125
+        self.root_exploration_fraction = 0.125
 
         # UCB formula
         self.pb_c_base = 19652
