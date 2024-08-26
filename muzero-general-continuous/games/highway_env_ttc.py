@@ -95,13 +95,13 @@ class MuZeroConfig:
 
         # Exponential learning rate schedule
         self.lr_init = 0.0001  # Initial learning rate
-        self.lr_decay_rate = 0.90  # Set it to 1 to use a constant learning rate
-        self.lr_decay_steps = 5000
+        self.lr_decay_rate = 0.95  # Set it to 1 to use a constant learning rate
+        self.lr_decay_steps = 12000
 
 
 
         ### Replay Buffer
-        self.replay_buffer_size = 12000  # Number of self-play games to keep in the replay buffer
+        self.replay_buffer_size = 9000  # Number of self-play games to keep in the replay buffer
         self.num_unroll_steps = 15  # Number of game moves to keep for every batch element
         self.td_steps = 50  # Number of steps in the future to take into account for calculating the target value
         self.PER = True  # Prioritized Replay (See paper appendix Training), select in priority the elements in the replay buffer which are unexpected for the network
