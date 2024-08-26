@@ -63,8 +63,8 @@ class MuZeroConfig:
         # network_config2
         self.network = "resnet"
         # Residual Network
-        self.blocks = 6  # Number of blocks in the ResNet
-        self.channels = 128  # Number of channels in the ResNet
+        self.blocks = 4  # Number of blocks in the ResNet
+        self.channels = 64  # Number of channels in the ResNet
         # Define channels for each head
         self.reduced_channels_reward = 128  # Number of channels in reward head
         self.reduced_channels_value = 128  # Number of channels in value head
@@ -95,8 +95,8 @@ class MuZeroConfig:
         初期稳定性不佳: 如果模型在训练的早期表现出不稳定的情况，可以稍微增大 value_loss_weight 来减轻这种波动。
         后期细调: 在训练的中后期，逐步调高 value_loss_weight，以确保价值预测的稳定性，并减少训练过程中的波动。
         """
-        self.value_loss_weight = 1.5  # 缩放value loss避免过拟合,论文参数是0.25
-        self.entropy_loss_weight = 0.05  # 缩放entropy_loss
+        self.value_loss_weight = 0.8  # 缩放value loss避免过拟合,论文参数是0.25
+        self.entropy_loss_weight = 0.1  # 缩放entropy_loss
         """
         # 初期阶段: 增大 entropy_loss_weight 以增强探索性，帮助模型更好地适应复杂环境。
         # 中后期阶段: 减小 entropy_loss_weight 以加快收敛，减少训练过程中的波动。
@@ -109,7 +109,7 @@ class MuZeroConfig:
 
         # Exponential learning rate schedule
         self.lr_init = 0.0001  # Initial learning rate
-        self.lr_decay_rate = 0.90  # Set it to 1 to use a constant learning rate
+        self.lr_decay_rate = 0.95  # Set it to 1 to use a constant learning rate
         self.lr_decay_steps = 500
 
         ### Replay Buffer
