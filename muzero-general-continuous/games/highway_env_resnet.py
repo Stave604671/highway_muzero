@@ -44,7 +44,7 @@ class MuZeroConfig:
         较大的 discount：Total Reward 的上升可能是逐步且持久的，因为模型能够逐步发现并利用长期的策略，最终获得更高的总回报。
         总结：discount 值的选择会影响 Total Reward 曲线的上升速度、平滑度和最终的总回报。一般情况下，较大的 discount 值能带来更稳定、更长期的回报，Total Reward 曲线更平滑且在后期继续上升。较小的 discount 值则可能带来更快的初期收益，但容易波动，并且总回报可能较低。
         """
-        self.discount = 0.97  # 长期回报的折扣因子
+        self.discount = 0.95  # 长期回报的折扣因子
         self.temperature_threshold = 800  # 单次play_games的温度阈值,当前的play_games内,最大移动self.max_moves次,moves的次数超过这个阈值后,温度直接为0,低于这个次数时,启用visit_softmax_temperature_fn获取温度数值
         # 'uniform' or 'density'
         # 在自动驾驶换道场景下：如果你希望模型重点考虑某些特定的换道策略（比如避免某些危险的换道动作），选择 density。
@@ -53,7 +53,7 @@ class MuZeroConfig:
 
         # UCB formula
         self.pb_c_base = 19652  # 数值越大,更倾向于利用选择已知效果较好的动作,而非探索新动作
-        self.pb_c_init = 1.25  # 初始化参数,对探索奖励有一个固定的提升作用.数值越大,初期的探索越多.反之更依赖已知动作
+        self.pb_c_init = 1.0  # 初始化参数,对探索奖励有一个固定的提升作用.数值越大,初期的探索越多.反之更依赖已知动作
 
         # Progressive widening parameter
         # pw_alpha用来调节何时对节点进行渐进扩展。渐进扩展的基本思想是，当一个节点的访问次数较少时，增加它的子节点的数量以增加探索的多样性，
@@ -95,8 +95,8 @@ class MuZeroConfig:
         初期稳定性不佳: 如果模型在训练的早期表现出不稳定的情况，可以稍微增大 value_loss_weight 来减轻这种波动。
         后期细调: 在训练的中后期，逐步调高 value_loss_weight，以确保价值预测的稳定性，并减少训练过程中的波动。
         """
-        self.value_loss_weight = 1  # 缩放value loss避免过拟合,论文参数是0.25
-        self.entropy_loss_weight = 0.08  # 缩放entropy_loss
+        self.value_loss_weight = 1.5  # 缩放value loss避免过拟合,论文参数是0.25
+        self.entropy_loss_weight = 0.05  # 缩放entropy_loss
         """
         # 初期阶段: 增大 entropy_loss_weight 以增强探索性，帮助模型更好地适应复杂环境。
         # 中后期阶段: 减小 entropy_loss_weight 以加快收敛，减少训练过程中的波动。
@@ -164,7 +164,7 @@ class MuZeroConfig:
         - **`self.PER_alpha`**：控制优先经验回放中的优先化程度，值越高，样本的选择越依赖其优先级，有助于更高效地利用经验样本。
         """
         self.PER = True  # Prioritized Replay (See paper appendix Training), select in priority the elements in the replay buffer which are unexpected for the network
-        self.PER_alpha = 0.6  # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
+        self.PER_alpha = 0.4  # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
 
         # Reanalyze (See paper appendix Reanalyse)
         self.use_last_model_value = True  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
