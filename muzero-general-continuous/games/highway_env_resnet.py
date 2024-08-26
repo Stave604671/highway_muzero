@@ -53,7 +53,7 @@ class MuZeroConfig:
 
         # UCB formula
         self.pb_c_base = 19652  # 数值越大,更倾向于利用选择已知效果较好的动作,而非探索新动作
-        self.pb_c_init = 1.5  # 初始化参数,对探索奖励有一个固定的提升作用.数值越大,初期的探索越多.反之更依赖已知动作
+        self.pb_c_init = 1.25  # 初始化参数,对探索奖励有一个固定的提升作用.数值越大,初期的探索越多.反之更依赖已知动作
 
         # Progressive widening parameter
         # pw_alpha用来调节何时对节点进行渐进扩展。渐进扩展的基本思想是，当一个节点的访问次数较少时，增加它的子节点的数量以增加探索的多样性，
@@ -63,7 +63,7 @@ class MuZeroConfig:
         # network_config2
         self.network = "resnet"
         # Residual Network
-        self.blocks = 4  # Number of blocks in the ResNet
+        self.blocks = 6  # Number of blocks in the ResNet
         self.channels = 128  # Number of channels in the ResNet
         # Define channels for each head
         self.reduced_channels_reward = 128  # Number of channels in reward head
@@ -96,7 +96,7 @@ class MuZeroConfig:
         后期细调: 在训练的中后期，逐步调高 value_loss_weight，以确保价值预测的稳定性，并减少训练过程中的波动。
         """
         self.value_loss_weight = 1  # 缩放value loss避免过拟合,论文参数是0.25
-        self.entropy_loss_weight = 0.1  # 缩放entropy_loss
+        self.entropy_loss_weight = 0.08  # 缩放entropy_loss
         """
         # 初期阶段: 增大 entropy_loss_weight 以增强探索性，帮助模型更好地适应复杂环境。
         # 中后期阶段: 减小 entropy_loss_weight 以加快收敛，减少训练过程中的波动。
@@ -108,7 +108,7 @@ class MuZeroConfig:
         self.momentum = 0.9  # Used only if optimizer is SGD
 
         # Exponential learning rate schedule
-        self.lr_init = 0.003  # Initial learning rate
+        self.lr_init = 0.0001  # Initial learning rate
         self.lr_decay_rate = 0.90  # Set it to 1 to use a constant learning rate
         self.lr_decay_steps = 500
 
@@ -164,7 +164,7 @@ class MuZeroConfig:
         - **`self.PER_alpha`**：控制优先经验回放中的优先化程度，值越高，样本的选择越依赖其优先级，有助于更高效地利用经验样本。
         """
         self.PER = True  # Prioritized Replay (See paper appendix Training), select in priority the elements in the replay buffer which are unexpected for the network
-        self.PER_alpha = 0.8  # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
+        self.PER_alpha = 0.6  # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
 
         # Reanalyze (See paper appendix Reanalyse)
         self.use_last_model_value = True  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
