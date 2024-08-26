@@ -35,7 +35,7 @@ class MuZeroConfig:
         self.max_moves = 1000  # Maximum number of moves if game is not finished before
         self.num_simulations = 35  # Number of future moves self-simulated
         self.discount = 0.97  # Chronological discount of the reward
-        self.temperature_threshold = None  # Number of moves before dropping temperature to 0 (ie playing according to the max)
+        self.temperature_threshold = 15000  # Number of moves before dropping temperature to 0 (ie playing according to the max)
         self.node_prior = 'uniform'  # 'uniform' or 'density'
 
         # Root prior exploration noise
