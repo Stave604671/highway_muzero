@@ -53,7 +53,7 @@ class MuZeroConfig:
 
         # UCB formula
         self.pb_c_base = 19652  # 数值越大,更倾向于利用选择已知效果较好的动作,而非探索新动作
-        self.pb_c_init = 1.0  # 初始化参数,对探索奖励有一个固定的提升作用.数值越大,初期的探索越多.反之更依赖已知动作
+        self.pb_c_init = 1.2  # 初始化参数,对探索奖励有一个固定的提升作用.数值越大,初期的探索越多.反之更依赖已知动作
 
         # Progressive widening parameter
         # pw_alpha用来调节何时对节点进行渐进扩展。渐进扩展的基本思想是，当一个节点的访问次数较少时，增加它的子节点的数量以增加探索的多样性，
@@ -74,7 +74,7 @@ class MuZeroConfig:
         self.resnet_fc_value_layers = [256, 256]  # Hidden layers for value head
         self.resnet_fc_policy_layers = [256, 256]
         # Hidden layers for policy head # Define the hidden layers in the policy head of the prediction network
-        self.support_size = 35  # Value and reward are scaled (with almost sqrt) and encoded on a vector with a range of -support_size to support_size
+        self.support_size = 15  # Value and reward are scaled (with almost sqrt) and encoded on a vector with a range of -support_size to support_size
         self.downsample = "resnet"  # Downsample observations before representation network, False / "CNN" (lighter) / "resnet" (See paper appendix Network Architecture)
 
         ### Training  训练相关参数
