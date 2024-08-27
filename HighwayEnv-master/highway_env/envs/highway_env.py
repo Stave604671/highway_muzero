@@ -103,7 +103,6 @@ class HighwayEnv(AbstractEnv):
         reward = sum(
             self.config.get(name, 0) * reward for name, reward in rewards.items()
         )
-        reward = np.clip(reward, -2, 2)
         if self.config["normalize_reward"]:
             reward = utils.lmap(
                 reward,
@@ -127,7 +126,7 @@ class HighwayEnv(AbstractEnv):
         # Use forward speed rather than speed, see https://github.com/eleurent/highway-env/issues/268
         forward_speed = self.vehicle.speed * np.cos(self.vehicle.heading)
         high_speed_reward = -1 + (forward_speed - v_min) / (v_max - v_min)
-        high_speed_reward = np.clip(high_speed_reward, -1, 1)  # 保证结果在 [-1, 1] 范围内
+        high_speed_reward = np.clip(high_speed_reward, 0, 1)  # 保证结果在 [-1, 1] 范围内
         # 判断是否进行了换道操作
         lane_change_reward = 0
         # logger.info(f"{self.vehicle.lane_index}-value1-{type(self.vehicle.lane_index)}")
@@ -139,11 +138,11 @@ class HighwayEnv(AbstractEnv):
         # logger.info(f"{self.vehicle.lane_index}-value3-{type(self.vehicle.lane_index)}")
         self.vehicle.last_lane_index = self.vehicle.lane_index[2]
         return {
-            "collision_reward": float(self.vehicle.crashed) * self.config["collision_reward"],
-            "right_lane_reward": lane / max(len(neighbours) - 1, 1) * self.config["right_lane_reward"],
-            "high_speed_reward": high_speed_reward * self.config["high_speed_reward"],
+            "collision_reward": float(self.vehicle.crashed),
+            "right_lane_reward": lane / max(len(neighbours) - 1, 1),
+            "high_speed_reward": high_speed_reward,
             "lane_change_reward": lane_change_reward,
-            "on_road_reward": float(self.vehicle.on_road) * self.config["on_road_reward"],
+            "on_road_reward": float(self.vehicle.on_road),
         }
 
     def _is_terminated(self) -> bool:
