@@ -63,7 +63,7 @@ class MuZeroConfig:
         # network_config2
         self.network = "resnet"
         # Residual Network
-        self.blocks = 6  # Number of blocks in the ResNet
+        self.blocks = 4  # Number of blocks in the ResNet
         self.channels = 128  # Number of channels in the ResNet
         # Define channels for each head
         self.reduced_channels_reward = 128  # Number of channels in reward head
@@ -113,7 +113,7 @@ class MuZeroConfig:
         self.lr_decay_steps = 1000
 
         ### Replay Buffer
-        self.replay_buffer_size = 9500  # 缓存空间中记录的自我监督的数据数量,给高了的话,容易引入噪声,如果给低了,性能不佳不稳定
+        self.replay_buffer_size = 5000  # 缓存空间中记录的自我监督的数据数量,给高了的话,容易引入噪声,如果给低了,性能不佳不稳定
         """
         举个例子：
         假设你在训练一个自动驾驶模型，在模拟中车辆经过一个弯道。设置 self.num_unroll_steps = 15 
