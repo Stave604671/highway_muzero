@@ -70,11 +70,11 @@ class MuZeroConfig:
         self.reduced_channels_value = 128  # Number of channels in value head
         self.reduced_channels_policy = 128  # Number of channels in policy head
         # Define hidden layers (example)
-        self.resnet_fc_reward_layers = [128, 128]  # Hidden layers for reward head
-        self.resnet_fc_value_layers = [128, 128]  # Hidden layers for value head
-        self.resnet_fc_policy_layers = [128, 128]
+        self.resnet_fc_reward_layers = [256, 256]  # Hidden layers for reward head
+        self.resnet_fc_value_layers = [256, 256]  # Hidden layers for value head
+        self.resnet_fc_policy_layers = [256, 256]
         # Hidden layers for policy head # Define the hidden layers in the policy head of the prediction network
-        self.support_size = 20  # Value and reward are scaled (with almost sqrt) and encoded on a vector with a range of -support_size to support_size
+        self.support_size = 35  # Value and reward are scaled (with almost sqrt) and encoded on a vector with a range of -support_size to support_size
         self.downsample = "resnet"  # Downsample observations before representation network, False / "CNN" (lighter) / "resnet" (See paper appendix Network Architecture)
 
         ### Training  训练相关参数
