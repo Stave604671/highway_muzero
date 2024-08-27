@@ -44,7 +44,7 @@ class MuZeroConfig:
         较大的 discount：Total Reward 的上升可能是逐步且持久的，因为模型能够逐步发现并利用长期的策略，最终获得更高的总回报。
         总结：discount 值的选择会影响 Total Reward 曲线的上升速度、平滑度和最终的总回报。一般情况下，较大的 discount 值能带来更稳定、更长期的回报，Total Reward 曲线更平滑且在后期继续上升。较小的 discount 值则可能带来更快的初期收益，但容易波动，并且总回报可能较低。
         """
-        self.discount = 0.97  # 长期回报的折扣因子
+        self.discount = 0.985  # 长期回报的折扣因子
         self.temperature_threshold = 800  # 单次play_games的温度阈值,当前的play_games内,最大移动self.max_moves次,moves的次数超过这个阈值后,温度直接为0,低于这个次数时,启用visit_softmax_temperature_fn获取温度数值
         # 'uniform' or 'density'
         # 在自动驾驶换道场景下：如果你希望模型重点考虑某些特定的换道策略（比如避免某些危险的换道动作），选择 density。
@@ -63,8 +63,8 @@ class MuZeroConfig:
         # network_config2
         self.network = "resnet"
         # Residual Network
-        self.blocks = 4  # Number of blocks in the ResNet
-        self.channels = 64  # Number of channels in the ResNet
+        self.blocks = 6  # Number of blocks in the ResNet
+        self.channels = 128  # Number of channels in the ResNet
         # Define channels for each head
         self.reduced_channels_reward = 128  # Number of channels in reward head
         self.reduced_channels_value = 128  # Number of channels in value head
