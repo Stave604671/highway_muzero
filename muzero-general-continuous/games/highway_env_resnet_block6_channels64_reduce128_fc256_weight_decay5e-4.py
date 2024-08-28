@@ -52,7 +52,7 @@ class MuZeroConfig:
         self.node_prior = 'uniform'
 
         # UCB formula
-        self.pb_c_base = 19652  # 数值越大,更倾向于利用选择已知效果较好的动作,而非探索新动作
+        self.pb_c_base = 19600  # 数值越大,更倾向于利用选择已知效果较好的动作,而非探索新动作
         self.pb_c_init = 1.2  # 初始化参数,对探索奖励有一个固定的提升作用.数值越大,初期的探索越多.反之更依赖已知动作
 
         # Progressive widening parameter
@@ -95,8 +95,8 @@ class MuZeroConfig:
         初期稳定性不佳: 如果模型在训练的早期表现出不稳定的情况，可以稍微增大 value_loss_weight 来减轻这种波动。
         后期细调: 在训练的中后期，逐步调高 value_loss_weight，以确保价值预测的稳定性，并减少训练过程中的波动。
         """
-        self.value_loss_weight = 1.2  # 缩放value loss避免过拟合,论文参数是0.25
-        self.entropy_loss_weight = 0.05  # 缩放entropy_loss
+        self.value_loss_weight = 1.25  # 缩放value loss避免过拟合,论文参数是0.25,直接给到五倍好了
+        self.entropy_loss_weight = 0.04  # 缩放entropy_loss
         """
         # 初期阶段: 增大 entropy_loss_weight 以增强探索性，帮助模型更好地适应复杂环境。
         # 中后期阶段: 减小 entropy_loss_weight 以加快收敛，减少训练过程中的波动。
@@ -164,7 +164,7 @@ class MuZeroConfig:
         - **`self.PER_alpha`**：控制优先经验回放中的优先化程度，值越高，样本的选择越依赖其优先级，有助于更高效地利用经验样本。
         """
         self.PER = True  # Prioritized Replay (See paper appendix Training), select in priority the elements in the replay buffer which are unexpected for the network
-        self.PER_alpha = 0.6  # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
+        self.PER_alpha = 0.8  # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
 
         # Reanalyze (See paper appendix Reanalyse)
         self.use_last_model_value = True  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
@@ -210,7 +210,7 @@ class Game(AbstractGame):
                                 'action': {'type': 'ContinuousAction',
                                            'acceleration_range': (-4, 4.0)},  # 为它扩展一个能够控制横向加速度和纵向加速度的子类
                                 'simulation_frequency': 5,  # 模拟频率
-                                'policy_frequency': 5,  # 策略频率
+                                'policy_frequency': 7,  # 策略频率
                                 # 纵向决策：IDM（智能驾驶模型）根据前车的距离和速度计算出加速度。
                                 'other_vehicles_type': 'highway_env.vehicle.behavior.IDMVehicle',
                                 'screen_width': 600,  # 屏幕宽度
@@ -230,8 +230,8 @@ class Game(AbstractGame):
                                 'ego_spacing': 1.5,  # 表示控制车辆（ego vehicle）与前一辆车之间的初始间隔距离。它用来设置在创建控制车辆时的车间距
                                 'vehicles_density': 1,
                                 "right_lane_reward": 1,  # 在最右边的车道上行驶时获得的奖励，在其他车道上线性映射为零。
-                                'collision_reward': -1,  # 与车辆相撞时获取的惩罚
-                                'on_road_reward': 1,  # 在路上正常行驶的奖励
+                                'collision_reward': -3,  # 与车辆相撞时获取的惩罚
+                                'on_road_reward': 2,  # 在路上正常行驶的奖励
                                 'high_speed_reward': 1,  # 维持高速行驶的奖励
                                 'lane_change_reward': -1,  # 换道的惩罚
                                 'reward_speed_range': [20, 30],  # 高速的奖励从这个范围线性映射到[0,HighwayEnv.HIGH_SPEED_REWARD]。
