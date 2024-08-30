@@ -221,6 +221,8 @@ class SelfPlay:
                 game_history.observation_history.append(observation)
                 game_history.reward_history.append(reward)
                 game_history.to_play_history.append(self.game.to_play())
+        self.game.render_rgb()
+        self.game.save_gif()
         return game_history
 
     def close_game(self):

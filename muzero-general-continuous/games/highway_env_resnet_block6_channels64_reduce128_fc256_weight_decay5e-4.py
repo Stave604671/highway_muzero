@@ -1,7 +1,7 @@
 import datetime
 import pathlib
 import time
-
+import imageio
 import gymnasium as gym
 import numpy
 import torch
@@ -282,3 +282,15 @@ class Game(AbstractGame):
         self.env.render()
         logger.info(f"end render step: {datetime.datetime.now()}")
         time.sleep(3)
+
+    def render_rgb(self):
+        rgb_img = self.env.render(mode='rgb_array')
+        self.gif_imgs.append(rgb_img)
+
+    def save_gif(self):
+        imageio.mimsave(
+            f'./{datetime.datetime.now().strftime("%Y-%m-%d--%H-%M-%S")}.gif',
+            self.gif_imgs,
+            fps=5,
+        )
+        self.gif_imgs = []
