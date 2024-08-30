@@ -284,7 +284,7 @@ class Game(AbstractGame):
         time.sleep(3)
 
     def render_rgb(self):
-        rgb_img = self.env.render(mode='rgb_array')
+        rgb_img = self.env.render()
         self.gif_imgs.append(rgb_img)
 
     def save_gif(self):
