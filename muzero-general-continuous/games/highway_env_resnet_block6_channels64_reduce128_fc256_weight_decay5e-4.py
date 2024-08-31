@@ -29,7 +29,7 @@ class MuZeroConfig:
         # Self-Play
         self.num_workers = 2  # 定义了同时进行 Self-Play 的工作线程数量，这些线程负责生成训练样本并将其存储到回放缓冲区中。
         self.selfplay_on_gpu = False  # 是否在gpu进行自我博弈,打开后速度变快,但是显存开支会高很多
-        self.max_moves = 1000  # 每场游戏的最大游戏次数,未发生碰撞,或者没有达到这个次数,单场游戏都不停止
+        self.max_moves = 800  # 每场游戏的最大游戏次数,未发生碰撞,或者没有达到这个次数,单场游戏都不停止
         self.num_simulations = 35  # 执行指定次数的模拟，每次模拟从根节点开始进行搜索和更新,
         """
         discount 参数对 Total Reward 曲线的影响可以从以下几个方面来理解：
@@ -45,7 +45,7 @@ class MuZeroConfig:
         总结：discount 值的选择会影响 Total Reward 曲线的上升速度、平滑度和最终的总回报。一般情况下，较大的 discount 值能带来更稳定、更长期的回报，Total Reward 曲线更平滑且在后期继续上升。较小的 discount 值则可能带来更快的初期收益，但容易波动，并且总回报可能较低。
         """
         self.discount = 0.985  # 长期回报的折扣因子
-        self.temperature_threshold = 800  # 单次play_games的温度阈值,当前的play_games内,最大移动self.max_moves次,moves的次数超过这个阈值后,温度直接为0,低于这个次数时,启用visit_softmax_temperature_fn获取温度数值
+        self.temperature_threshold = 500  # 单次play_games的温度阈值,当前的play_games内,最大移动self.max_moves次,moves的次数超过这个阈值后,温度直接为0,低于这个次数时,启用visit_softmax_temperature_fn获取温度数值
         # 'uniform' or 'density'
         # 在自动驾驶换道场景下：如果你希望模型重点考虑某些特定的换道策略（比如避免某些危险的换道动作），选择 density。
         # 如果你希望模型自行探索各种可能的换道策略，选择 uniform。
@@ -87,7 +87,7 @@ class MuZeroConfig:
         # 整体训练轮次
         self.training_steps = 20000  # Total number of training steps (ie weights update according to a batch)
         # batch size大小
-        self.batch_size = 512  # Number of parts of games to train on at each training step
+        self.batch_size = 256  # Number of parts of games to train on at each training step
         # 多少轮保存一次数据
         self.checkpoint_interval = 10  # Number of training steps before using the model for self-playing
         """
@@ -202,7 +202,7 @@ class Game(AbstractGame):
                             config={  # 需要在程序启动这个观测器之前使用自定义的公式来对观测车辆的初始速度和初始位置进行初始化
                                 'observation': {"type": "Kinematics",  # 使用这个观测器作为状态空间，可以获取观测车辆位置、观测车辆速度和观测车辆转向角
                                                 "vehicles_count": 21,  # 20辆周围车辆
-                                                "features": ["presence", "x", "y", "vx", "vy", "cos_h", "sin_h"],
+                                                "features": ["presence", "x", "y", "vx", "vy"],
                                                 "features_range": {
                                                     "x": [-100, 100],
                                                     "y": [-100, 100],
@@ -214,8 +214,9 @@ class Game(AbstractGame):
                                                 "order": "sorted"  # 根据与自车的距离从近到远排列。这种排列方式使得观测数组的顺序保持稳定
                                                 },
                                 'action': {'type': 'ContinuousAction',
-                                           'acceleration_range': (-4, 4.0)},  # 为它扩展一个能够控制横向加速度和纵向加速度的子类
-                                'simulation_frequency': 5,  # 模拟频率
+                                           'acceleration_range': (-4, 4.0),
+                                           'steering_range': (-np.pi / 8, np.pi / 8)},  # 为它扩展一个能够控制横向加速度和纵向加速度的子类
+                                'simulation_frequency': 15,  # 模拟频率
                                 'policy_frequency': 1,  # 策略频率
                                 # 纵向决策：IDM（智能驾驶模型）根据前车的距离和速度计算出加速度。
                                 'other_vehicles_type': 'highway_env.vehicle.behavior.IDMVehicle',
@@ -227,7 +228,7 @@ class Game(AbstractGame):
                                 'render_agent': True,  # 控制渲染是否应用到屏幕
                                 'offscreen_rendering': False,  # 当前的渲染是否是在屏幕外进行的。如果为False，意味着渲染是在屏幕上进行的，
                                 'manual_control': False,  # 是否允许键盘控制观测车辆
-                                'real_time_rendering': False,  # 是否实时渲染画面
+                                'real_time_rendering': True,  # 是否实时渲染画面
                                 'lanes_count': 4,  # 车道数量
                                 # 'normalize_reward': True,
                                 'controlled_vehicles': 1,  # 一次只控制一辆车
@@ -235,10 +236,10 @@ class Game(AbstractGame):
                                 'duration': 30,  # 限制了仿真的时间长度
                                 'ego_spacing': 1.5,  # 表示控制车辆（ego vehicle）与前一辆车之间的初始间隔距离。它用来设置在创建控制车辆时的车间距
                                 'vehicles_density': 1,
-                                "right_lane_reward": 0.1,  # 在最右边的车道上行驶时获得的奖励，在其他车道上线性映射为零。
+                                "right_lane_reward": 0.5,  # 在最右边的车道上行驶时获得的奖励，在其他车道上线性映射为零。
                                 'collision_reward': -1,  # 与车辆相撞时获取的惩罚
-                                'high_speed_reward': 0.4,  # 维持高速行驶的奖励
-                                'lane_change_reward': -0.5,  # 换道的惩罚
+                                'high_speed_reward': 0.5,  # 维持高速行驶的奖励
+                                'lane_change_reward': -1,  # 换道的惩罚
                                 'reward_speed_range': [20, 30],  # 高速的奖励从这个范围线性映射到[0,HighwayEnv.HIGH_SPEED_REWARD]。
                                 'offroad_terminal': True  # 车辆偏离道路是否会导致仿真结束
                             })
@@ -293,9 +294,9 @@ class Game(AbstractGame):
         self.gif_imgs.append(rgb_img)
 
     def save_gif(self):
-        imageio.mimsave(
-            f'./{datetime.datetime.now().strftime("%Y-%m-%d--%H-%M-%S")}.gif',
-            self.gif_imgs,
-            fps=5,
-        )
+        # imageio.mimsave(
+        #     f'./{datetime.datetime.now().strftime("%Y-%m-%d--%H-%M-%S")}.gif',
+        #     self.gif_imgs,
+        #     fps=5,
+        # )
         self.gif_imgs = []

@@ -100,6 +100,8 @@ class HighwayEnv(AbstractEnv):
         :return: the corresponding reward
         """
         rewards = self._rewards(action)
+        if not self.vehicle.on_road:
+            rewards["offroad_penalty"] = -2.0  # 更大的越界惩罚
         reward = sum(
             self.config.get(name, 0) * reward for name, reward in rewards.items()
         )
@@ -138,14 +140,14 @@ class HighwayEnv(AbstractEnv):
 
         # 更新 last_lane_index
         self.vehicle.last_lane_index = self.vehicle.lane_index[2]
-
+        logger.info(f"检测当前是否偏离了道路，显示1没有偏离，2有偏离____{float(self.vehicle.on_road)}")
         # 计算并返回各项奖励
         return {
             "collision_reward": float(self.vehicle.crashed),
             "right_lane_reward": lane / max(len(neighbours) - 1, 1),
             "high_speed_reward": high_speed_reward,
             "lane_change_reward": lane_change_reward,
-            "on_road_reward": float(self.vehicle.on_road),
+            "on_road_reward": float(self.vehicle.on_road)+1,
         }
 
     def _is_terminated(self) -> bool:
