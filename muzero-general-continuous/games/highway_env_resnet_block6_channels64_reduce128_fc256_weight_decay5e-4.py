@@ -203,6 +203,12 @@ class Game(AbstractGame):
                                 'observation': {"type": "Kinematics",  # 使用这个观测器作为状态空间，可以获取观测车辆位置、观测车辆速度和观测车辆转向角
                                                 "vehicles_count": 21,  # 20辆周围车辆
                                                 "features": ["presence", "x", "y", "vx", "vy", "cos_h", "sin_h"],
+                                                "features_range": {
+                                                    "x": [-100, 100],
+                                                    "y": [-100, 100],
+                                                    "vx": [-20, 20],
+                                                    "vy": [-20, 20]
+                                                },
                                                 # 控制状态空间包括转向角
                                                 "absolute": True,  # 使用相对坐标，相对于观测车辆。为True时使用相对于环境的全局坐标系。
                                                 "order": "sorted"  # 根据与自车的距离从近到远排列。这种排列方式使得观测数组的顺序保持稳定
@@ -210,7 +216,7 @@ class Game(AbstractGame):
                                 'action': {'type': 'ContinuousAction',
                                            'acceleration_range': (-4, 4.0)},  # 为它扩展一个能够控制横向加速度和纵向加速度的子类
                                 'simulation_frequency': 5,  # 模拟频率
-                                'policy_frequency': 4,  # 策略频率
+                                'policy_frequency': 1,  # 策略频率
                                 # 纵向决策：IDM（智能驾驶模型）根据前车的距离和速度计算出加速度。
                                 'other_vehicles_type': 'highway_env.vehicle.behavior.IDMVehicle',
                                 'screen_width': 600,  # 屏幕宽度
@@ -229,11 +235,10 @@ class Game(AbstractGame):
                                 'duration': 30,  # 限制了仿真的时间长度
                                 'ego_spacing': 1.5,  # 表示控制车辆（ego vehicle）与前一辆车之间的初始间隔距离。它用来设置在创建控制车辆时的车间距
                                 'vehicles_density': 1,
-                                "right_lane_reward": 1,  # 在最右边的车道上行驶时获得的奖励，在其他车道上线性映射为零。
-                                'collision_reward': -3,  # 与车辆相撞时获取的惩罚
-                                'on_road_reward': 2,  # 在路上正常行驶的奖励
-                                'high_speed_reward': 1,  # 维持高速行驶的奖励
-                                'lane_change_reward': -1,  # 换道的惩罚
+                                "right_lane_reward": 0.1,  # 在最右边的车道上行驶时获得的奖励，在其他车道上线性映射为零。
+                                'collision_reward': -1,  # 与车辆相撞时获取的惩罚
+                                'high_speed_reward': 0.4,  # 维持高速行驶的奖励
+                                'lane_change_reward': -0.5,  # 换道的惩罚
                                 'reward_speed_range': [20, 30],  # 高速的奖励从这个范围线性映射到[0,HighwayEnv.HIGH_SPEED_REWARD]。
                                 'offroad_terminal': True  # 车辆偏离道路是否会导致仿真结束
                             })
