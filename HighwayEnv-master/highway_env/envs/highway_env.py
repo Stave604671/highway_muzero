@@ -146,18 +146,33 @@ class HighwayEnv(AbstractEnv):
         lane_change_reward = 0
         if hasattr(self.vehicle, 'last_lane_index'):
             if self.vehicle.lane_index[2] != self.vehicle.last_lane_index:
-                #lane_change_reward = self.config["lane_change_reward"]
+                # lane_change_reward = self.config["lane_change_reward"]
                 if self.is_vehicle_on_road():
-                    logger.info(f"没偏离")
+                    # logger.info(f"没偏离")
+                    print("没偏离")
                     lane_change_reward = self.config["lane_change_reward"]
                 else:
                     # 车辆已换道但不在道路上，处理相应的奖励或惩罚
-                    logger.info(f"偏离")
+                    # logger.info(f"偏离")
+                    print("偏离")
                     lane_change_reward = self.config.get("off_road_penalty", -3)
+                    # 将 lane_index 转换为列表以便修改
+                    lane_index_list = list(self.vehicle.lane_index)
+                    # 修改车道索引
+                    lane_index_list[2] = self.vehicle.last_lane_index
+                    # 将修改后的列表转换回元组
+                    self.vehicle.lane_index = tuple(lane_index_list)
+            return {
+                "collision_reward": float(self.vehicle.crashed),
+                "right_lane_reward": lane / max(len(neighbours) - 1, 1),
+                "high_speed_reward": high_speed_reward,
+                "lane_change_reward": lane_change_reward,
+                "on_road_reward": float(self.vehicle.on_road) + 1,
+            }
 
         # 更新 last_lane_index
         self.vehicle.last_lane_index = self.vehicle.lane_index[2]
-        #logger.info(f"检测当前是否偏离了道路，显示1没有偏离，2有偏离____{float(self.vehicle.on_road)}")
+        logger.info(f"测试")
         # 计算并返回各项奖励
         return {
             "collision_reward": float(self.vehicle.crashed),
