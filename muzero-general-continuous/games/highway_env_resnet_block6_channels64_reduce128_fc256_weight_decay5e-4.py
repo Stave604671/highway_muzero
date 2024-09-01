@@ -17,7 +17,7 @@ class MuZeroConfig:
         self.max_num_gpus = None  # 固定使用gpu的最大数量.使用单个gpu会更快,没有配置的话会默认使用所有gpu
 
         # Game
-        self.observation_shape = (1, 21, 7)  # 游戏观测空间的维度,如果观测空间三维无所谓,如果是一维,需要配成(1,1,x)
+        self.observation_shape = (1, 21, 5)  # 游戏观测空间的维度,如果观测空间三维无所谓,如果是一维,需要配成(1,1,x)
         self.action_space = 2  # 动作空间的大小
         self.players = [i for i in range(1)]  # 玩家的数量,车辆换道场景观测和控制车辆只有一个,为1就行
         self.stacked_observations = 0  # 观测时叠加的历史观察数量（包括过去的动作）。
@@ -217,7 +217,7 @@ class Game(AbstractGame):
                                            'acceleration_range': (-4, 4.0),
                                            'steering_range': (-np.pi / 8, np.pi / 8)},  # 为它扩展一个能够控制横向加速度和纵向加速度的子类
                                 'simulation_frequency': 15,  # 模拟频率
-                                'policy_frequency': 1,  # 策略频率
+                                'policy_frequency': 5,  # 策略频率
                                 # 纵向决策：IDM（智能驾驶模型）根据前车的距离和速度计算出加速度。
                                 'other_vehicles_type': 'highway_env.vehicle.behavior.IDMVehicle',
                                 'screen_width': 600,  # 屏幕宽度
@@ -237,11 +237,11 @@ class Game(AbstractGame):
                                 'ego_spacing': 1.5,  # 表示控制车辆（ego vehicle）与前一辆车之间的初始间隔距离。它用来设置在创建控制车辆时的车间距
                                 'vehicles_density': 1,
                                 "right_lane_reward": 0.5,  # 在最右边的车道上行驶时获得的奖励，在其他车道上线性映射为零。
-                                'collision_reward': -1,  # 与车辆相撞时获取的惩罚
-                                'high_speed_reward': 0.5,  # 维持高速行驶的奖励
-                                'lane_change_reward': -1,  # 换道的惩罚
+                                'collision_reward': -3,  # 与车辆相撞时获取的惩罚
+                                'high_speed_reward': 2.5,  # 维持高速行驶的奖励
+                                'lane_change_reward': -2,  # 换道的惩罚
                                 'reward_speed_range': [20, 30],  # 高速的奖励从这个范围线性映射到[0,HighwayEnv.HIGH_SPEED_REWARD]。
-                                'offroad_terminal': True  # 车辆偏离道路是否会导致仿真结束
+                                'offroad_terminal': False  # 车辆偏离道路是否会导致仿真结束
                             })
         self.seed = seed
         self.env.reset()
@@ -276,7 +276,7 @@ class Game(AbstractGame):
 
         # Reshape the observation to 3D (1, 1, -1)
         observation = np.array(observation)
-        observation = observation.reshape((1, 21, 7))
+        observation = observation.reshape((1, 21, 5))
         # logger.info(f"Observation2 reset shape after step:{type(observation)}-shape-{observation.shape}")
         return observation
 

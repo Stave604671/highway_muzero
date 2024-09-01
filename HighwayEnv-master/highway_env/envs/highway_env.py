@@ -117,6 +117,16 @@ class HighwayEnv(AbstractEnv):
         reward *= rewards["on_road_reward"]
         return reward
 
+    def is_vehicle_on_road(self):
+        #判断车是否在车道上
+        # 假设车道索引在 [0, total_lanes-1] 范围内有效
+        total_lanes = self.config.get("total_lanes", 3)
+        current_lane_index = self.vehicle.lane_index[2]
+
+        if 0 <= current_lane_index < total_lanes:
+            return True
+        else:
+            return False
     def _rewards(self, action: Action) -> Dict[Text, float]:
         neighbours = self.road.network.all_side_lanes(self.vehicle.lane_index)
         lane = (
@@ -136,7 +146,13 @@ class HighwayEnv(AbstractEnv):
         lane_change_reward = 0
         if hasattr(self.vehicle, 'last_lane_index'):
             if self.vehicle.lane_index[2] != self.vehicle.last_lane_index:
-                lane_change_reward = self.config["lane_change_reward"]
+                #lane_change_reward = self.config["lane_change_reward"]
+                if self.is_vehicle_on_road(self):
+                    logger.info(f"检测当前是否偏离了道路，显示1没有偏离，2有偏离____{float(self.vehicle.on_road)}")
+                    lane_change_reward = self.config["lane_change_reward"]
+                else:
+                    # 车辆已换道但不在道路上，处理相应的奖励或惩罚
+                    lane_change_reward = self.config.get("off_road_penalty", -3)
 
         # 更新 last_lane_index
         self.vehicle.last_lane_index = self.vehicle.lane_index[2]
