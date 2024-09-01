@@ -101,7 +101,7 @@ class HighwayEnv(AbstractEnv):
         """
         rewards = self._rewards(action)
         if not self.vehicle.on_road:
-            rewards["offroad_penalty"] = -2.0  # 更大的越界惩罚
+            rewards["offroad_penalty"] = self.config.get("offroad_penalty", -2)  # 更大的越界惩罚
         reward = sum(
             self.config.get(name, 0) * reward for name, reward in rewards.items()
         )
@@ -136,8 +136,9 @@ class HighwayEnv(AbstractEnv):
         lane_change_reward = 0
         if hasattr(self.vehicle, 'last_lane_index'):
             if self.vehicle.lane_index[2] != self.vehicle.last_lane_index:
-                lane_change_reward = self.config["lane_change_reward"]
-
+                lane_change_reward = self.config.get("offroad_penalty", -2)   # 换道得到惩罚
+            else:
+                lane_change_reward = self.config.get("lane_change_reward", 3)  # 没有换道得到奖励
         # 更新 last_lane_index
         self.vehicle.last_lane_index = self.vehicle.lane_index[2]
         logger.info(f"检测当前是否偏离了道路，显示1没有偏离，2有偏离____{float(self.vehicle.on_road)}")
