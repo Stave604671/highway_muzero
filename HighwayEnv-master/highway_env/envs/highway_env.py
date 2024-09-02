@@ -10,6 +10,7 @@ from highway_env.utils import near_split
 from highway_env.vehicle.controller import ControlledVehicle
 from highway_env.vehicle.kinematics import Vehicle
 from ray import logger
+
 Observation = np.ndarray
 
 
@@ -38,13 +39,14 @@ class HighwayEnv(AbstractEnv):
                 "ego_spacing": 2,
                 "vehicles_density": 1,
                 "collision_reward": -1,  # The reward received when colliding with a vehicle.
-                "right_lane_reward": 0.1,  # The reward received when driving on the right-most lanes, linearly mapped to
+                "right_lane_reward": 0.1,
+                # The reward received when driving on the right-most lanes, linearly mapped to
                 # zero for other lanes.
                 "high_speed_reward": 0.4,  # The reward received when driving at full speed, linearly mapped to zero for
                 # lower speeds according to config["reward_speed_range"].
                 "lane_change_reward": 0,  # The reward received at each lane change action.
                 "reward_speed_range": [20, 30],
-                "normalize_reward": True,
+                "normalize_reward": False,
                 "offroad_terminal": False,
             }
         )
@@ -54,6 +56,32 @@ class HighwayEnv(AbstractEnv):
     def _reset(self) -> None:
         self._create_road()
         self._create_vehicles()
+        self.previous_state = self._save_vehicle_state()  # 保存初始状态
+
+    def _save_vehicle_state(self) -> Dict:
+        """保存车辆的状态"""
+        return {
+            'lane_index': self.vehicle.lane_index[:],
+            'position': self.vehicle.position.copy()  # 保存车辆位置
+        }
+
+    def _restore_vehicle_state(self, state: Dict) -> None:
+        """恢复车辆的状态"""
+        # 恢复车道索引
+        self.vehicle.lane_index = state['lane_index']
+
+        # 恢复车辆位置
+        self.vehicle.position = state['position']
+
+        # 检查并调整位置
+        if not self.is_vehicle_on_road():
+            # print(f"车辆偏离车道，调整到车道中心位置。")
+            self.vehicle.position = self.get_nearest_road_position(self.vehicle.position)
+
+        # 调试信息
+        # print(f"恢复后的车辆位置: {self.vehicle.position}")
+        # print(f"恢复后的车道索引: {self.vehicle.lane_index}")
+        # print(f"恢复后是否在车道上: {self.is_vehicle_on_road()}")
 
     def _create_road(self) -> None:
         """Create a road composed of straight adjacent lanes."""
@@ -99,13 +127,14 @@ class HighwayEnv(AbstractEnv):
         :param current_position: 车辆当前的位置
         :return: 车辆应该被重置到的道路上的位置
         """
-        # 获取车辆当前车道的几何信息
         road_network = self.road.network
         lane_index = self.vehicle.lane_index  # 获取当前车道的索引
         lane = road_network.get_lane(lane_index)  # 获取当前车道对象
-
         # 返回车道中心线最接近的点
-        return lane.position(current_position[0], current_position[1])
+        nearest_position = lane.position(current_position[0], current_position[1])
+        # 调试信息
+        # print(f"当前位置: {current_position}, 最近车道位置: {nearest_position}")
+        return nearest_position
 
     def _reward(self, action: Action) -> float:
         """
@@ -116,20 +145,31 @@ class HighwayEnv(AbstractEnv):
         rewards = self._rewards(action)
         # if not self.vehicle.on_road:
         #     rewards["offroad_penalty"] = -2.0  # 更大的越界惩罚
-        #********************
+        # ********************
         if not self.vehicle.on_road:
             # 车辆已换道但不在道路上，处理相应的奖励或惩罚
             # logger.info(f"没偏离")
-            print("偏离")
+            # print("偏离")
             rewards["offroad_penalty"] = -3.0  # 更大的越界惩罚
-            # 将车辆重新放回道路上
-            self.vehicle.position = self.get_nearest_road_position(self.vehicle.position)
-            self.vehicle.on_road = True  # 标记车辆已经在道路上
+            # 将车辆重新放回道路上，恢复到之前保存的状态
+            self._restore_vehicle_state(self.previous_state)
+            # 调试输出: 检查放回后的车辆位置和 on_road 状态
+            # print(f"放回后的车道索引: {self.vehicle.lane_index}")
+            # if not self.vehicle.on_road:
+            #     print("放回失败")
+            # else:
+            #     print("放回成功")
+            # self.vehicle.on_road = True  # 标记车辆已经在道路上
         else:
             # logger.info(f"偏离")
-            print("没偏离")
+            # print("没偏离")
             rewards["offroad_penalty"] = 0.5
-        #***********************
+            # 打印未偏离时的车辆位置和车道索引
+            # print(f"未偏离的车道索引:{self.vehicle.lane_index}")
+            # print(f"未偏离的车辆位置：{self.vehicle.position}")
+            # 保存当前未偏离的状态
+            self.previous_state = self._save_vehicle_state()
+        # ***********************
         reward = sum(
             self.config.get(name, 0) * reward for name, reward in rewards.items()
         )
@@ -138,7 +178,7 @@ class HighwayEnv(AbstractEnv):
                 reward,
                 [
                     self.config["collision_reward"],
-                    self.config["high_speed_reward"]+self.config["right_lane_reward"],
+                    self.config["high_speed_reward"] + self.config["right_lane_reward"],
                 ],
                 [0, 1],
             )
@@ -146,15 +186,16 @@ class HighwayEnv(AbstractEnv):
         return reward
 
     def is_vehicle_on_road(self):
-        #判断车是否在车道上
-        # 假设车道索引在 [0, total_lanes-1] 范围内有效
-        total_lanes = self.config.get("total_lanes", 3)
-        current_lane_index = self.vehicle.lane_index[2]
-
-        if 0 <= current_lane_index < total_lanes:
-            return True
+        """判断车辆是否在车道上"""
+        # 假设车道索引是整数类型，确保索引是有效的
+        if isinstance(self.vehicle.lane_index, tuple):
+            lane_index = int(self.vehicle.lane_index[2])
         else:
-            return False
+            lane_index = self.vehicle.lane_index
+
+        total_lanes = self.config.get("total_lanes", 3)
+        return 0 <= lane_index < total_lanes
+
     def _rewards(self, action: Action) -> Dict[Text, float]:
         neighbours = self.road.network.all_side_lanes(self.vehicle.lane_index)
         lane = (
@@ -176,7 +217,6 @@ class HighwayEnv(AbstractEnv):
             if self.vehicle.lane_index[2] != self.vehicle.last_lane_index:
                 lane_change_reward = self.config["lane_change_reward"]
 
-
         # 更新 last_lane_index
         self.vehicle.last_lane_index = self.vehicle.lane_index[2]
         logger.info(f"测试")
@@ -186,15 +226,15 @@ class HighwayEnv(AbstractEnv):
             "right_lane_reward": lane / max(len(neighbours) - 1, 1),
             "high_speed_reward": high_speed_reward,
             "lane_change_reward": lane_change_reward,
-            "on_road_reward": float(self.vehicle.on_road)+1,
+            "on_road_reward": float(self.vehicle.on_road) + 1,
         }
 
     def _is_terminated(self) -> bool:
         """The episode is over if the ego vehicle crashed."""
         return (
-            self.vehicle.crashed
-            or self.config["offroad_terminal"]
-            and not self.vehicle.on_road
+                self.vehicle.crashed
+                or self.config["offroad_terminal"]
+                and not self.vehicle.on_road
         )
 
     def _is_truncated(self) -> bool:
