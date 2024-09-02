@@ -44,37 +44,37 @@ class MuZeroConfig:
         较大的 discount：Total Reward 的上升可能是逐步且持久的，因为模型能够逐步发现并利用长期的策略，最终获得更高的总回报。
         总结：discount 值的选择会影响 Total Reward 曲线的上升速度、平滑度和最终的总回报。一般情况下，较大的 discount 值能带来更稳定、更长期的回报，Total Reward 曲线更平滑且在后期继续上升。较小的 discount 值则可能带来更快的初期收益，但容易波动，并且总回报可能较低。
         """
-        self.discount = 0.985  # 长期回报的折扣因子
-        self.temperature_threshold = 500  # 单次play_games的温度阈值,当前的play_games内,最大移动self.max_moves次,moves的次数超过这个阈值后,温度直接为0,低于这个次数时,启用visit_softmax_temperature_fn获取温度数值
+        self.discount = 0.997  # 长期回报的折扣因子
+        self.temperature_threshold = 600  # 单次play_games的温度阈值,当前的play_games内,最大移动self.max_moves次,moves的次数超过这个阈值后,温度直接为0,低于这个次数时,启用visit_softmax_temperature_fn获取温度数值
         # 'uniform' or 'density'
         # 在自动驾驶换道场景下：如果你希望模型重点考虑某些特定的换道策略（比如避免某些危险的换道动作），选择 density。
         # 如果你希望模型自行探索各种可能的换道策略，选择 uniform。
         self.node_prior = 'uniform'
 
         # UCB formula
-        self.pb_c_base = 10600  # 数值越大,更倾向于利用选择已知效果较好的动作,而非探索新动作
-        self.pb_c_init = 1.2  # 初始化参数,对探索奖励有一个固定的提升作用.数值越大,初期的探索越多.反之更依赖已知动作
+        self.pb_c_base = 19652  # 数值越大,更倾向于利用选择已知效果较好的动作,而非探索新动作
+        self.pb_c_init = 1.25  # 初始化参数,对探索奖励有一个固定的提升作用.数值越大,初期的探索越多.反之更依赖已知动作
 
         # Progressive widening parameter
         # pw_alpha用来调节何时对节点进行渐进扩展。渐进扩展的基本思想是，当一个节点的访问次数较少时，增加它的子节点的数量以增加探索的多样性，
         # 从而避免过早地确定子节点的评估结果。
-        self.pw_alpha = 0.4
+        self.pw_alpha = 0.49
 
         # network_config2
         self.network = "resnet"
         # Residual Network
-        self.blocks = 6  # Number of blocks in the ResNet
+        self.blocks = 16  # Number of blocks in the ResNet
         self.channels = 64  # Number of channels in the ResNet
         # Define channels for each head
-        self.reduced_channels_reward = 128  # Number of channels in reward head
-        self.reduced_channels_value = 128  # Number of channels in value head
-        self.reduced_channels_policy = 128  # Number of channels in policy head
+        self.reduced_channels_reward = 64  # Number of channels in reward head
+        self.reduced_channels_value = 64  # Number of channels in value head
+        self.reduced_channels_policy = 64  # Number of channels in policy head
         # Define hidden layers (example)
-        self.resnet_fc_reward_layers = [256, 256]  # Hidden layers for reward head
-        self.resnet_fc_value_layers = [256, 256]  # Hidden layers for value head
-        self.resnet_fc_policy_layers = [256, 256]
+        self.resnet_fc_reward_layers = [64, 64]  # Hidden layers for reward head
+        self.resnet_fc_value_layers = [64, 64]  # Hidden layers for value head
+        self.resnet_fc_policy_layers = [64, 64]
         # Hidden layers for policy head # Define the hidden layers in the policy head of the prediction network
-        self.support_size = 15  # Value and reward are scaled (with almost sqrt) and encoded on a vector with a range of -support_size to support_size
+        self.support_size = 10  # Value and reward are scaled (with almost sqrt) and encoded on a vector with a range of -support_size to support_size
         self.downsample = "resnet"  # Downsample observations before representation network, False / "CNN" (lighter) / "resnet" (See paper appendix Network Architecture)
 
         ### Training  训练相关参数
@@ -95,8 +95,8 @@ class MuZeroConfig:
         初期稳定性不佳: 如果模型在训练的早期表现出不稳定的情况，可以稍微增大 value_loss_weight 来减轻这种波动。
         后期细调: 在训练的中后期，逐步调高 value_loss_weight，以确保价值预测的稳定性，并减少训练过程中的波动。
         """
-        self.value_loss_weight = 0.5  # 缩放value loss避免过拟合,论文参数是0.25,直接给到五倍好了
-        self.entropy_loss_weight = 0.04  # 缩放entropy_loss
+        self.value_loss_weight = 1.25  # 缩放value loss避免过拟合,论文参数是0.25,直接给到五倍好了
+        self.entropy_loss_weight = 0.1  # 缩放entropy_loss
         """
         # 初期阶段: 增大 entropy_loss_weight 以增强探索性，帮助模型更好地适应复杂环境。
         # 中后期阶段: 减小 entropy_loss_weight 以加快收敛，减少训练过程中的波动。
@@ -113,7 +113,7 @@ class MuZeroConfig:
         self.lr_decay_steps = 1000
 
         ### Replay Buffer
-        self.replay_buffer_size = 5000  # 缓存空间中记录的自我监督的数据数量,给高了的话,容易引入噪声,如果给低了,性能不佳不稳定
+        self.replay_buffer_size = 900  # 缓存空间中记录的自我监督的数据数量,给高了的话,容易引入噪声,如果给低了,性能不佳不稳定
         """
         举个例子：
         假设你在训练一个自动驾驶模型，在模拟中车辆经过一个弯道。设置 self.num_unroll_steps = 15 
@@ -124,7 +124,7 @@ class MuZeroConfig:
         这个参数的配置对模型捕捉时间相关性和优化长期决策非常关键。
         选择合适的 num_unroll_steps 可以帮助模型更好地理解和预测未来的状态和奖励，从而提升训练效果和决策质量。
         """
-        self.num_unroll_steps = 15  # 每个批次中保留多少数量的moves的数据
+        self.num_unroll_steps = 25  # 每个批次中保留多少数量的moves的数据
         """
         例子：
         假设在一个自动驾驶任务中，车辆需要计划如何通过一个复杂的交通路口。设置 td_steps 为 5 意味着模型将根据未来的 
@@ -198,7 +198,7 @@ class Game(AbstractGame):
     """
 
     def __init__(self, seed=None):
-        self.env = gym.make('highway-v0', render_mode="rgb_array",
+        self.env = gym.make('highway-fast-v0', render_mode="rgb_array",
                             config={  # 需要在程序启动这个观测器之前使用自定义的公式来对观测车辆的初始速度和初始位置进行初始化
                                 'observation': {"type": "Kinematics",  # 使用这个观测器作为状态空间，可以获取观测车辆位置、观测车辆速度和观测车辆转向角
                                                 "vehicles_count": 21,  # 20辆周围车辆
@@ -239,8 +239,8 @@ class Game(AbstractGame):
                                 "right_lane_reward": 1,  # 在最右边的车道上行驶时获得的奖励，在其他车道上线性映射为零。
                                 'collision_reward': -1,  # 与车辆相撞时获取的惩罚
                                 'high_speed_reward': 1.5,  # 维持高速行驶的奖励
-                                'lane_change_reward': 2,  # 没有换道得到奖励
-                                "offroad_penalty": -1,  # 换道惩罚
+                                'lane_change_reward': 3,  # 没有换道得到奖励
+                                "offroad_penalty": -2.5,  # 换道惩罚
                                 'reward_speed_range': [20, 30],  # 高速的奖励从这个范围线性映射到[0,HighwayEnv.HIGH_SPEED_REWARD]。
                                 'offroad_terminal': True  # 车辆偏离道路是否会导致仿真结束
                             })
