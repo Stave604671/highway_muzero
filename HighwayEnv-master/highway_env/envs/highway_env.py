@@ -74,14 +74,14 @@ class HighwayEnv(AbstractEnv):
         self.vehicle.position = state['position']
 
         # 检查并调整位置
-        if not self.is_vehicle_on_road():
+        if not self.vehicle.on_road:
             # print(f"车辆偏离车道，调整到车道中心位置。")
             self.vehicle.position = self.get_nearest_road_position(self.vehicle.position)
 
         # 调试信息
         # print(f"恢复后的车辆位置: {self.vehicle.position}")
         # print(f"恢复后的车道索引: {self.vehicle.lane_index}")
-        # print(f"恢复后是否在车道上: {self.is_vehicle_on_road()}")
+        print(f"恢复后是否在车道上: {self.vehicle.on_road}")
 
     def _create_road(self) -> None:
         """Create a road composed of straight adjacent lanes."""
