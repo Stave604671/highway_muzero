@@ -29,8 +29,8 @@ class MuZeroConfig:
         # Self-Play
         self.num_workers = 2  # 定义了同时进行 Self-Play 的工作线程数量，这些线程负责生成训练样本并将其存储到回放缓冲区中。
         self.selfplay_on_gpu = False  # 是否在gpu进行自我博弈,打开后速度变快,但是显存开支会高很多
-        self.max_moves = 800  # 每场游戏的最大游戏次数,未发生碰撞,或者没有达到这个次数,单场游戏都不停止
-        self.num_simulations = 35  # 执行指定次数的模拟，每次模拟从根节点开始进行搜索和更新,
+        self.max_moves = 80  # 每场游戏的最大游戏次数,未发生碰撞,或者没有达到这个次数,单场游戏都不停止
+        self.num_simulations = 50  # 执行指定次数的模拟，每次模拟从根节点开始进行搜索和更新,
         """
         discount 参数对 Total Reward 曲线的影响可以从以下几个方面来理解：
         (1)未来回报的重要性：
@@ -44,21 +44,21 @@ class MuZeroConfig:
         较大的 discount：Total Reward 的上升可能是逐步且持久的，因为模型能够逐步发现并利用长期的策略，最终获得更高的总回报。
         总结：discount 值的选择会影响 Total Reward 曲线的上升速度、平滑度和最终的总回报。一般情况下，较大的 discount 值能带来更稳定、更长期的回报，Total Reward 曲线更平滑且在后期继续上升。较小的 discount 值则可能带来更快的初期收益，但容易波动，并且总回报可能较低。
         """
-        self.discount = 0.997  # 长期回报的折扣因子
-        self.temperature_threshold = 600  # 单次play_games的温度阈值,当前的play_games内,最大移动self.max_moves次,moves的次数超过这个阈值后,温度直接为0,低于这个次数时,启用visit_softmax_temperature_fn获取温度数值
+        self.discount = 0.975  # 长期回报的折扣因子
+        self.temperature_threshold = 60  # 单次play_games的温度阈值,当前的play_games内,最大移动self.max_moves次,moves的次数超过这个阈值后,温度直接为0,低于这个次数时,启用visit_softmax_temperature_fn获取温度数值
         # 'uniform' or 'density'
         # 在自动驾驶换道场景下：如果你希望模型重点考虑某些特定的换道策略（比如避免某些危险的换道动作），选择 density。
         # 如果你希望模型自行探索各种可能的换道策略，选择 uniform。
         self.node_prior = 'uniform'
 
         # UCB formula
-        self.pb_c_base = 19652  # 数值越大,更倾向于利用选择已知效果较好的动作,而非探索新动作
-        self.pb_c_init = 1.25  # 初始化参数,对探索奖励有一个固定的提升作用.数值越大,初期的探索越多.反之更依赖已知动作
+        self.pb_c_base = 15652  # 数值越大,更倾向于利用选择已知效果较好的动作,而非探索新动作
+        self.pb_c_init = 3  # 初始化参数,对探索奖励有一个固定的提升作用.数值越大,初期的探索越多.反之更依赖已知动作
 
         # Progressive widening parameter
         # pw_alpha用来调节何时对节点进行渐进扩展。渐进扩展的基本思想是，当一个节点的访问次数较少时，增加它的子节点的数量以增加探索的多样性，
         # 从而避免过早地确定子节点的评估结果。
-        self.pw_alpha = 0.49
+        self.pw_alpha = 0.89
 
         # network_config2
         self.network = "resnet"
@@ -133,7 +133,7 @@ class MuZeroConfig:
         td_steps 是一个控制时间差分更新步数的参数，用于决定在计算当前状态的目标价值时，要向未来看多少步。
         它影响了模型在短期与长期回报之间的权衡，配置合适的 td_steps 对于提升模型的表现至关重要。
         """
-        self.td_steps = 50  # Number of steps in the future to take into account for calculating the target value
+        self.td_steps = 15  # Number of steps in the future to take into account for calculating the target value
         """
         这两个参数 `self.PER` 和 `self.PER_alpha` 与**优先经验回放（Prioritized Experience Replay, PER）**相关，这是强化学习中用于提高样本效率和加快收敛的一种技术。
         ### 1. **`self.PER`**: 
