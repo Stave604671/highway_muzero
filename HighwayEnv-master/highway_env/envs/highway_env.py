@@ -67,6 +67,8 @@ class HighwayEnv(AbstractEnv):
 
     def _restore_vehicle_state(self, state: Dict) -> None:
         """恢复车辆的状态"""
+
+
         # 恢复车道索引
         self.vehicle.lane_index = state['lane_index']
 
@@ -74,9 +76,9 @@ class HighwayEnv(AbstractEnv):
         self.vehicle.position = state['position']
 
         # 检查并调整位置
-        if not self.vehicle.on_road:
+        #if not self.vehicle.on_road:
             # print(f"车辆偏离车道，调整到车道中心位置。")
-            self.vehicle.position = self.get_nearest_road_position(self.vehicle.position)
+        #self.vehicle.position = self.get_nearest_road_position(self.vehicle.position)
 
         # 调试信息
         # print(f"恢复后的车辆位置: {self.vehicle.position}")
@@ -146,29 +148,39 @@ class HighwayEnv(AbstractEnv):
         # if not self.vehicle.on_road:
         #     rewards["offroad_penalty"] = -2.0  # 更大的越界惩罚
         # ********************
-        if not self.vehicle.on_road:
-            # 车辆已换道但不在道路上，处理相应的奖励或惩罚
-            # logger.info(f"没偏离")
-            # print("偏离")
-            rewards["offroad_penalty"] = -3.0  # 更大的越界惩罚
+
+        if self.vehicle.on_road:
+            self.previous_state = self._save_vehicle_state()
+            rewards["offroad_penalty"] = 0.5
+        else :
             # 将车辆重新放回道路上，恢复到之前保存的状态
             self._restore_vehicle_state(self.previous_state)
-            # 调试输出: 检查放回后的车辆位置和 on_road 状态
-            # print(f"放回后的车道索引: {self.vehicle.lane_index}")
-            # if not self.vehicle.on_road:
-            #     print("放回失败")
-            # else:
-            #     print("放回成功")
-            # self.vehicle.on_road = True  # 标记车辆已经在道路上
-        else:
-            # logger.info(f"偏离")
-            # print("没偏离")
-            rewards["offroad_penalty"] = 0.5
-            # 打印未偏离时的车辆位置和车道索引
-            # print(f"未偏离的车道索引:{self.vehicle.lane_index}")
-            # print(f"未偏离的车辆位置：{self.vehicle.position}")
-            # 保存当前未偏离的状态
-            self.previous_state = self._save_vehicle_state()
+            rewards["offroad_penalty"] = -3.0  # 更大的越界惩罚
+
+
+        # if not self.vehicle.on_road:
+        #     # 车辆已换道但不在道路上，处理相应的奖励或惩罚
+        #     # logger.info(f"没偏离")
+        #     # print("偏离")
+        #     rewards["offroad_penalty"] = -3.0  # 更大的越界惩罚
+        #     # 将车辆重新放回道路上，恢复到之前保存的状态
+        #     self._restore_vehicle_state(self.previous_state)
+        #     # 调试输出: 检查放回后的车辆位置和 on_road 状态
+        #     # print(f"放回后的车道索引: {self.vehicle.lane_index}")
+        #     # if not self.vehicle.on_road:
+        #     #     print("放回失败")
+        #     # else:
+        #     #     print("放回成功")
+        #     # self.vehicle.on_road = True  # 标记车辆已经在道路上
+        # else:
+        #     # logger.info(f"偏离")
+        #     # print("没偏离")
+        #     rewards["offroad_penalty"] = 0.5
+        #     # 打印未偏离时的车辆位置和车道索引
+        #     # print(f"未偏离的车道索引:{self.vehicle.lane_index}")
+        #     # print(f"未偏离的车辆位置：{self.vehicle.position}")
+        #     # 保存当前未偏离的状态
+        #     self.previous_state = self._save_vehicle_state()
         # ***********************
         reward = sum(
             self.config.get(name, 0) * reward for name, reward in rewards.items()
@@ -184,17 +196,6 @@ class HighwayEnv(AbstractEnv):
             )
         reward *= rewards["on_road_reward"]
         return reward
-
-    def is_vehicle_on_road(self):
-        """判断车辆是否在车道上"""
-        # 假设车道索引是整数类型，确保索引是有效的
-        if isinstance(self.vehicle.lane_index, tuple):
-            lane_index = int(self.vehicle.lane_index[2])
-        else:
-            lane_index = self.vehicle.lane_index
-
-        total_lanes = self.config.get("total_lanes", 3)
-        return 0 <= lane_index < total_lanes
 
     def _rewards(self, action: Action) -> Dict[Text, float]:
         neighbours = self.road.network.all_side_lanes(self.vehicle.lane_index)
