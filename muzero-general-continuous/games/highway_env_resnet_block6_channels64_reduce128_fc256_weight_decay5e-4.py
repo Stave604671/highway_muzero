@@ -29,7 +29,7 @@ class MuZeroConfig:
         # Self-Play
         self.num_workers = 2  # 定义了同时进行 Self-Play 的工作线程数量，这些线程负责生成训练样本并将其存储到回放缓冲区中。
         self.selfplay_on_gpu = False  # 是否在gpu进行自我博弈,打开后速度变快,但是显存开支会高很多
-        self.max_moves = 800  # 每场游戏的最大游戏次数,未发生碰撞,或者没有达到这个次数,单场游戏都不停止
+        self.max_moves = 100  # 每场游戏的最大游戏次数,未发生碰撞,或者没有达到这个次数,单场游戏都不停止
         self.num_simulations = 35  # 执行指定次数的模拟，每次模拟从根节点开始进行搜索和更新,
         """
         discount 参数对 Total Reward 曲线的影响可以从以下几个方面来理解：

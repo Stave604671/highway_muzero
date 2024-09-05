@@ -10,7 +10,14 @@ from highway_env.utils import near_split
 from highway_env.vehicle.controller import ControlledVehicle
 from highway_env.vehicle.kinematics import Vehicle
 from ray import logger
+import threading
 
+lock = threading.Lock()
+from queue import Queue
+
+# 使用线程局部存储
+thread_local = threading.local()
+state_queue = Queue()
 Observation = np.ndarray
 
 
@@ -53,37 +60,41 @@ class HighwayEnv(AbstractEnv):
 
         return config
 
+    # def _reset(self) -> None:
+    #     self._create_road()
+    #     self._create_vehicles()
+    #     #self.previous_state = self._save_vehicle_state()  # 保存初始状态
     def _reset(self) -> None:
         self._create_road()
         self._create_vehicles()
+        self.state_saved = False
+        self._initialize_thread_state()  # 初始化线程状态
         self.previous_state = self._save_vehicle_state()  # 保存初始状态
+
+    def _initialize_thread_state(self) -> None:
+        """初始化线程的状态存储"""
+        if not hasattr(thread_local, 'previous_state'):
+            thread_local.previous_state = self._save_vehicle_state()
 
     def _save_vehicle_state(self) -> Dict:
         """保存车辆的状态"""
-        return {
+        state = {
             'lane_index': self.vehicle.lane_index[:],
-            'position': self.vehicle.position.copy()  # 保存车辆位置
+            'position': self.vehicle.position.copy()
         }
+        return state
+        # return {
+        #     'lane_index': self.vehicle.lane_index[:],
+        #     'position': self.vehicle.position.copy()  # 保存车辆位置
+        # }
 
-    def _restore_vehicle_state(self, state: Dict) -> None:
-        """恢复车辆的状态"""
-
-
-        # 恢复车道索引
-        self.vehicle.lane_index = state['lane_index']
-
-        # 恢复车辆位置
-        self.vehicle.position = state['position']
-
-        # 检查并调整位置
-        #if not self.vehicle.on_road:
-            # print(f"车辆偏离车道，调整到车道中心位置。")
-        #self.vehicle.position = self.get_nearest_road_position(self.vehicle.position)
-
-        # 调试信息
-        # print(f"恢复后的车辆位置: {self.vehicle.position}")
-        # print(f"恢复后的车道索引: {self.vehicle.lane_index}")
-        print(f"恢复后是否在车道上: {self.vehicle.on_road}")
+    # def _restore_vehicle_state(self, state: Dict) -> None:
+    #     """恢复车辆的状态"""
+    #     print("瞅瞅stste里都有啥：",state)
+    #     self.vehicle.lane_index = state['lane_index']
+    #     self.vehicle.position = state['position']
+    #     print("看一下新的state：",self.vehicle.lane_index,self.vehicle.position)
+    #     print(f"恢复后是否在车道上: {self.vehicle.on_road}")
 
     def _create_road(self) -> None:
         """Create a road composed of straight adjacent lanes."""
@@ -139,49 +150,24 @@ class HighwayEnv(AbstractEnv):
         return nearest_position
 
     def _reward(self, action: Action) -> float:
-        """
-        The reward is defined to foster driving at high speed, on the rightmost lanes, and to avoid collisions.
-        :param action: the last action performed
-        :return: the corresponding reward
-        """
         rewards = self._rewards(action)
-        # if not self.vehicle.on_road:
-        #     rewards["offroad_penalty"] = -2.0  # 更大的越界惩罚
-        # ********************
 
         if self.vehicle.on_road:
-            self.previous_state = self._save_vehicle_state()
-            rewards["offroad_penalty"] = 0.5
-        else :
-            # 将车辆重新放回道路上，恢复到之前保存的状态
-            self._restore_vehicle_state(self.previous_state)
-            rewards["offroad_penalty"] = -3.0  # 更大的越界惩罚
+            if not self.state_saved:  # 检查标志变量
+                # logger.info(f"是否在车道上: {self.vehicle.on_road}，是的话保存当前状态")
+                self.previous_state = self._save_vehicle_state()
+                # logger.info(f"看一下保存的state：{self.previous_state}")
+                self.state_saved = True  # 一旦保存，设置标志为True
+            rewards["right_lane_reward"] = 0.5
+        else:
+            # 将车辆重新放回道路上，恢复到之前保存的状态{'lane_index': ('0', '1', 3), 'position': array([138.129816  ,  13.11193569])}
+            self.vehicle.lane_index = self.previous_state["lane_index"]
+            self.vehicle.position = self.previous_state["position"]
+            # print("看一下新的state：",self.vehicle.lane_index,self.vehicle.position)
+            # print(f"恢复后是否在车道上: {self.vehicle.on_road}")
+            # self._restore_vehicle_state(self.previous_state)
+            rewards["lane_change_reward"] = -5.0  # 更大的越界惩罚
 
-
-        # if not self.vehicle.on_road:
-        #     # 车辆已换道但不在道路上，处理相应的奖励或惩罚
-        #     # logger.info(f"没偏离")
-        #     # print("偏离")
-        #     rewards["offroad_penalty"] = -3.0  # 更大的越界惩罚
-        #     # 将车辆重新放回道路上，恢复到之前保存的状态
-        #     self._restore_vehicle_state(self.previous_state)
-        #     # 调试输出: 检查放回后的车辆位置和 on_road 状态
-        #     # print(f"放回后的车道索引: {self.vehicle.lane_index}")
-        #     # if not self.vehicle.on_road:
-        #     #     print("放回失败")
-        #     # else:
-        #     #     print("放回成功")
-        #     # self.vehicle.on_road = True  # 标记车辆已经在道路上
-        # else:
-        #     # logger.info(f"偏离")
-        #     # print("没偏离")
-        #     rewards["offroad_penalty"] = 0.5
-        #     # 打印未偏离时的车辆位置和车道索引
-        #     # print(f"未偏离的车道索引:{self.vehicle.lane_index}")
-        #     # print(f"未偏离的车辆位置：{self.vehicle.position}")
-        #     # 保存当前未偏离的状态
-        #     self.previous_state = self._save_vehicle_state()
-        # ***********************
         reward = sum(
             self.config.get(name, 0) * reward for name, reward in rewards.items()
         )
@@ -194,7 +180,6 @@ class HighwayEnv(AbstractEnv):
                 ],
                 [0, 1],
             )
-        reward *= rewards["on_road_reward"]
         return reward
 
     def _rewards(self, action: Action) -> Dict[Text, float]:
@@ -204,6 +189,7 @@ class HighwayEnv(AbstractEnv):
             if isinstance(self.vehicle, ControlledVehicle)
             else self.vehicle.lane_index[2]
         )
+        # print("让我看看config里都有啥：",self.config)
         v_min, v_max = self.config["reward_speed_range"]
         # Use forward speed rather than speed, see https://github.com/eleurent/highway-env/issues/268
         forward_speed = self.vehicle.speed * np.cos(self.vehicle.heading)
