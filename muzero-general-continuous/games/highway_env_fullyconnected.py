@@ -45,7 +45,7 @@ class MuZeroConfig:
         总结：discount 值的选择会影响 Total Reward 曲线的上升速度、平滑度和最终的总回报。一般情况下，较大的 discount 值能带来更稳定、更长期的回报，Total Reward 曲线更平滑且在后期继续上升。较小的 discount 值则可能带来更快的初期收益，但容易波动，并且总回报可能较低。
         """
         self.discount = 0.97  # 长期回报的折扣因子
-        self.temperature_threshold = 800  # 单次play_games的温度阈值,当前的play_games内,最大移动self.max_moves次,moves的次数超过这个阈值后,温度直接为0,低于这个次数时,启用visit_softmax_temperature_fn获取温度数值
+        self.temperature_threshold = 80  # 单次play_games的温度阈值,当前的play_games内,最大移动self.max_moves次,moves的次数超过这个阈值后,温度直接为0,低于这个次数时,启用visit_softmax_temperature_fn获取温度数值
         # 'uniform' or 'density'
         # 在自动驾驶换道场景下：如果你希望模型重点考虑某些特定的换道策略（比如避免某些危险的换道动作），选择 density。
         # 如果你希望模型自行探索各种可能的换道策略，选择 uniform。
@@ -83,7 +83,7 @@ class MuZeroConfig:
         # 整体训练轮次
         self.training_steps = 20000  # Total number of training steps (ie weights update according to a batch)
         # batch size大小
-        self.batch_size = 512  # Number of parts of games to train on at each training step
+        self.batch_size = 128  # Number of parts of games to train on at each training step
         # 多少轮保存一次数据
         self.checkpoint_interval = 10  # Number of training steps before using the model for self-playing
         """
@@ -106,7 +106,7 @@ class MuZeroConfig:
         # Exponential learning rate schedule
         self.lr_init = 0.0001  # Initial learning rate
         self.lr_decay_rate = 0.90  # Set it to 1 to use a constant learning rate
-        self.lr_decay_steps = 500
+        self.lr_decay_steps = 5000
 
         ### Replay Buffer
         self.replay_buffer_size = 9500  # 缓存空间中记录的自我监督的数据数量,给高了的话,容易引入噪声,如果给低了,性能不佳不稳定
@@ -199,6 +199,12 @@ class Game(AbstractGame):
                                 'observation': {"type": "Kinematics",  # 使用这个观测器作为状态空间，可以获取观测车辆位置、观测车辆速度和观测车辆转向角
                                                 "vehicles_count": 21,  # 20辆周围车辆
                                                 "features": ["presence", "x", "y", "vx", "vy", "cos_h", "sin_h"],
+                                                "features_range": {
+                                                    "x": [-100, 100],
+                                                    "y": [-100, 100],
+                                                    "vx": [-20, 20],
+                                                    "vy": [-20, 20]
+                                                },
                                                 # 控制状态空间包括转向角
                                                 "absolute": True,  # 使用相对坐标，相对于观测车辆。为True时使用相对于环境的全局坐标系。
                                                 "order": "sorted"  # 根据与自车的距离从近到远排列。这种排列方式使得观测数组的顺序保持稳定

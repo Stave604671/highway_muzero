@@ -13,112 +13,82 @@ from .abstract_game import AbstractGame
 class MuZeroConfig:
     def __init__(self):
         # fmt: off
-        self.seed = 0  # 随机数种子,用于固定随机性方便复现
-        self.max_num_gpus = None  # 固定使用gpu的最大数量.使用单个gpu会更快,没有配置的话会默认使用所有gpu
+        self.seed = 0  # Seed for numpy, torch and the game
+        self.max_num_gpus = None  # Fix the maximum number of GPUs to use. It's usually faster to use a single GPU (set it to 1) if it has enough memory. None will use every GPUs available
 
-        # Game
-        self.observation_shape = (1, 21, 7)  # 游戏观测空间的维度,如果观测空间三维无所谓,如果是一维,需要配成(1,1,x)
-        self.action_space = 2  # 动作空间的大小
-        self.players = [i for i in range(1)]  # 玩家的数量,车辆换道场景观测和控制车辆只有一个,为1就行
-        self.stacked_observations = 0  # 观测时叠加的历史观察数量（包括过去的动作）。
+        ### Game
+        self.observation_shape = (1, 21,
+                                  7)  # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
+        self.action_space = 2  # Number of dimensions in the action space
+        self.players = [i for i in range(1)]  # List of players. You should only edit the length
+        self.stacked_observations = 0  # Number of previous observations and previous actions to add to the current observation
 
         # Evaluate
-        self.muzero_player = 0  # 用于区分多玩家环境中谁是 MuZero 控制的玩家。自我对弈默认是0.
-        self.opponent = None  # MuZero 面对的对手，用于评估在多人游戏中的进展。可以是 "random" 或 "expert"，如果在游戏类中实现了对手
+        self.muzero_player = 0  # Turn Muzero begins to play (0: MuZero plays first, 1: MuZero plays second)
+        self.opponent = None  # Hard coded agent that MuZero faces to assess his progress in multiplayer games. It doesn't influence training. None, "random" or "expert" if implemented in the Game class
 
-        # Self-Play
-        self.num_workers = 2  # 定义了同时进行 Self-Play 的工作线程数量，这些线程负责生成训练样本并将其存储到回放缓冲区中。
-        self.selfplay_on_gpu = False  # 是否在gpu进行自我博弈,打开后速度变快,但是显存开支会高很多
-        self.max_moves = 1000  # 每场游戏的最大游戏次数,未发生碰撞,或者没有达到这个次数,单场游戏都不停止
-        self.num_simulations = 35  # 执行指定次数的模拟，每次模拟从根节点开始进行搜索和更新,
-        """
-        discount 参数对 Total Reward 曲线的影响可以从以下几个方面来理解：
-        (1)未来回报的重要性：
-        较小的 discount：如果 discount 值较小，模型会更关注短期回报，导致它在每一步的策略中更倾向于最大化当前的奖励。这种情况下，Total Reward 曲线可能会快速上升，但也容易达到一个平台期，因为模型忽略了远期回报的影响，容易陷入局部最优。
-        较大的 discount：如果 discount 值较大，模型会同时考虑短期和长期回报。这通常会让Total Reward曲线在前期上升较慢，因为模型更注重长期规划，愿意在短期内做出一些“牺牲”。但是，随着训练的进行，Total Reward 曲线可能会更平滑地上升，最终达到更高的总回报。
-        (2)曲线的波动性：
-        较小的 discount：由于关注短期回报，Total Reward 曲线可能会更加波动，因为模型会快速调整策略以适应即时回报的变化。这可能导致曲线在某些时候突然上升或下降，缺乏稳定性。
-        较大的 discount：考虑到长远的回报，模型的决策会更加稳定，Total Reward 曲线也会变得相对平滑，波动性减小。虽然曲线的增长速度在前期可能较慢，但随着时间的推移，它通常能持续上升。
-        (3)长期收益的体现：
-        较小的 discount：在总训练步数较长的情况下，Total Reward 可能会在早期快速上升，然后趋于平稳甚至停滞，因为模型已经优化了短期回报，而未能充分利用长期回报。
-        较大的 discount：Total Reward 的上升可能是逐步且持久的，因为模型能够逐步发现并利用长期的策略，最终获得更高的总回报。
-        总结：discount 值的选择会影响 Total Reward 曲线的上升速度、平滑度和最终的总回报。一般情况下，较大的 discount 值能带来更稳定、更长期的回报，Total Reward 曲线更平滑且在后期继续上升。较小的 discount 值则可能带来更快的初期收益，但容易波动，并且总回报可能较低。
-        """
-        self.discount = 0.97  # 长期回报的折扣因子
-        self.temperature_threshold = 800   #  单次play_games的温度阈值,当前的play_games内,最大移动self.max_moves次,moves的次数超过这个阈值后,温度直接为0,低于这个次数时,启用visit_softmax_temperature_fn获取温度数值
-        # 'uniform' or 'density'
-        # 在自动驾驶换道场景下：如果你希望模型重点考虑某些特定的换道策略（比如避免某些危险的换道动作），选择 density。
-        # 如果你希望模型自行探索各种可能的换道策略，选择 uniform。
-        self.node_prior = 'uniform'
+        ### Self-Play
+        self.num_workers = 2  # Number of simultaneous threads self-playing to feed the replay buffer
+        self.selfplay_on_gpu = False  # 启用渲染需要把它打开
+        self.max_moves = 1000  # Maximum number of moves if game is not finished before
+        self.num_simulations = 35  # Number of future moves self-simulated
+        self.discount = 0.97  # Chronological discount of the reward
+        self.temperature_threshold = 15000  # Number of moves before dropping temperature to 0 (ie playing according to the max)
+        self.node_prior = 'uniform'  # 'uniform' or 'density'
+
+        # Root prior exploration noise
+        self.root_dirichlet_alpha = 0.125
+        self.root_exploration_fraction = 0.125
 
         # UCB formula
-        self.pb_c_base = 19652  #  数值越大,更倾向于利用选择已知效果较好的动作,而非探索新动作
-        self.pb_c_init = 1.25   # 初始化参数,对探索奖励有一个固定的提升作用.数值越大,初期的探索越多.反之更依赖已知动作
+        self.pb_c_base = 19652
+        self.pb_c_init = 1.25
 
         # Progressive widening parameter
-        # pw_alpha用来调节何时对节点进行渐进扩展。渐进扩展的基本思想是，当一个节点的访问次数较少时，增加它的子节点的数量以增加探索的多样性，
-        # 从而避免过早地确定子节点的评估结果。
         self.pw_alpha = 0.4
 
+        ### Network
+        self.network = "fullyconnected"  # "resnet" / "fullyconnected"
+        self.support_size = 20  # Value and reward are scaled (with almost sqrt) and encoded on a vector with a range of -support_size to support_size
 
-        # Network_config1  只有选择为fullyconnected的时候,下面的参数才会生效,否则,下面resnet的参数才会生效
-        # self.network = "fullyconnected"
-        # self.log_std_clamp = (-20, 2)  # Clamp the standard deviation
-        # self.encoding_size = 40
-        # # Fully Connected Network
-        # self.fc_reward_layers = [128, 128]  # Define the hidden layers in the reward network
-        # self.fc_value_layers = [128, 128]  # Define the hidden layers in the value network
-        # self.fc_mu_policy_layers = [128, 128]  # Define the hidden layers in the policy network
-        # self.fc_log_std_policy_layers = [128, 128]  # Define the hidden layers in the policy network
-        # self.fc_representation_layers = [128, 128]  # Define the hidden layers in the representation network
-        # self.fc_dynamics_layers = [128, 128]  # Define the hidden layers in the dynamics network
-        # self.support_size = 20  # Value and reward are scaled (with almost sqrt) and encoded on a vector with a range of -support_size to support_size
-
-
-        # network_config2
-        self.network = "resnet"
         # Residual Network
+        self.downsample = "resnet"  # Downsample observations before representation network, False / "CNN" (lighter) / "resnet" (See paper appendix Network Architecture)
         self.blocks = 6  # Number of blocks in the ResNet
         self.channels = 128  # Number of channels in the ResNet
         # Define channels for each head
         self.reduced_channels_reward = 128  # Number of channels in reward head
         self.reduced_channels_value = 128  # Number of channels in value head
         self.reduced_channels_policy = 128  # Number of channels in policy head
+
         # Define hidden layers (example)
         self.resnet_fc_reward_layers = [128, 128]  # Hidden layers for reward head
         self.resnet_fc_value_layers = [128, 128]  # Hidden layers for value head
         self.resnet_fc_policy_layers = [128, 128]
         # Hidden layers for policy head # Define the hidden layers in the policy head of the prediction network
-        self.support_size = 20  # Value and reward are scaled (with almost sqrt) and encoded on a vector with a range of -support_size to support_size
-        self.downsample = "resnet"  # Downsample observations before representation network, False / "CNN" (lighter) / "resnet" (See paper appendix Network Architecture)
+        # self.resnet_fc_reconstruction_layers = [32]  # Define the hidden layers in the reconstruction head of the reconstruction network
 
+        # Fully Connected Network
+        self.encoding_size = 40
+        self.fc_representation_layers = [128, 128]  # Define the hidden layers in the representation network
+        self.fc_dynamics_layers = [128, 128]  # Define the hidden layers in the dynamics network
+        self.fc_reward_layers = [128, 128]  # Define the hidden layers in the reward network
+        self.fc_value_layers = [128, 128]  # Define the hidden layers in the value network
+        self.fc_mu_policy_layers = [128, 128]  # Define the hidden layers in the policy network
+        self.fc_log_std_policy_layers = [128, 128]  # Define the hidden layers in the policy network
 
-        ### Training  训练相关参数
-        # 训练日志和相关数据保存地址
+        ### Training
         self.results_path = pathlib.Path(__file__).resolve().parents[1] / "results" / pathlib.Path(
             __file__).stem / datetime.datetime.now().strftime(
             "%Y-%m-%d--%H-%M-%S")  # Path to store the model weights and TensorBoard logs
-        # 保存模型权重
         self.save_model = True  # Save the checkpoint in results_path as model.checkpoint
-        # 整体训练轮次
         self.training_steps = 20000  # Total number of training steps (ie weights update according to a batch)
-        # batch size大小
         self.batch_size = 512  # Number of parts of games to train on at each training step
-        # 多少轮保存一次数据
         self.checkpoint_interval = 10  # Number of training steps before using the model for self-playing
-        """
-        总结：
-        初期稳定性不佳: 如果模型在训练的早期表现出不稳定的情况，可以稍微增大 value_loss_weight 来减轻这种波动。
-        后期细调: 在训练的中后期，逐步调高 value_loss_weight，以确保价值预测的稳定性，并减少训练过程中的波动。
-        """
-        self.value_loss_weight = 1  # 缩放value loss避免过拟合,论文参数是0.25
-        self.entropy_loss_weight = 0.08  # 缩放entropy_loss
-        """
-        # 初期阶段: 增大 entropy_loss_weight 以增强探索性，帮助模型更好地适应复杂环境。
-        # 中后期阶段: 减小 entropy_loss_weight 以加快收敛，减少训练过程中的波动。
-        # 平衡策略: 根据具体任务需求，找到适中的配置，确保训练过程的稳定性和策略的有效性。
-        """
+        self.value_loss_weight = 1  # Scale the value loss to avoid overfitting of the value function, paper recommends 0.25 (See paper appendix Reanalyze)
+        self.entropy_loss_weight = 0.08  # Scale the entropy loss
+        self.log_std_clamp = (-20, 2)  # Clamp the standard deviation
         self.train_on_gpu = torch.cuda.is_available()  # Train on GPU if available
+
         self.optimizer = "AdamW"  # "Adam" or "SGD". Paper uses SGD
         self.weight_decay = 1e-4  # L2 weights regularization
         self.momentum = 0.9  # Used only if optimizer is SGD
@@ -126,59 +96,12 @@ class MuZeroConfig:
         # Exponential learning rate schedule
         self.lr_init = 0.0001  # Initial learning rate
         self.lr_decay_rate = 0.90  # Set it to 1 to use a constant learning rate
-        self.lr_decay_steps = 500
+        self.lr_decay_steps = 5000
 
         ### Replay Buffer
-        self.replay_buffer_size = 9500  # 缓存空间中记录的自我监督的数据数量,给高了的话,容易引入噪声,如果给低了,性能不佳不稳定
-        """
-        举个例子：
-        假设你在训练一个自动驾驶模型，在模拟中车辆经过一个弯道。设置 self.num_unroll_steps = 15 
-        意味着模型会同时考虑到进入弯道的前 15 步以及驶出弯道的后 15 步的所有状态和决策。
-        这有助于模型理解如何在弯道中保持最佳车速和方向。
-        总结：
-        self.num_unroll_steps 决定了模型在每个训练批次中要展开多少步（或状态转换）。
-        这个参数的配置对模型捕捉时间相关性和优化长期决策非常关键。
-        选择合适的 num_unroll_steps 可以帮助模型更好地理解和预测未来的状态和奖励，从而提升训练效果和决策质量。
-        """
-        self.num_unroll_steps = 15  # 每个批次中保留多少数量的moves的数据
-        """
-        例子：
-        假设在一个自动驾驶任务中，车辆需要计划如何通过一个复杂的交通路口。设置 td_steps 为 5 意味着模型将根据未来的 
-        5 个状态及其奖励来估计当前决策的价值。这可以帮助模型更好地权衡在复杂路口中短期和长期的风险与收益。
-        总结：
-        td_steps 是一个控制时间差分更新步数的参数，用于决定在计算当前状态的目标价值时，要向未来看多少步。
-        它影响了模型在短期与长期回报之间的权衡，配置合适的 td_steps 对于提升模型的表现至关重要。
-        """
+        self.replay_buffer_size = 9500  # Number of self-play games to keep in the replay buffer
+        self.num_unroll_steps = 15  # Number of game moves to keep for every batch element
         self.td_steps = 50  # Number of steps in the future to take into account for calculating the target value
-        """
-        这两个参数 `self.PER` 和 `self.PER_alpha` 与**优先经验回放（Prioritized Experience Replay, PER）**相关，这是强化学习中用于提高样本效率和加快收敛的一种技术。
-        ### 1. **`self.PER`**: 
-           - **定义**: `self.PER` 是一个布尔值，用于控制是否启用优先经验回放机制。
-           - **作用**:
-             - **启用优先经验回放**: 当 `self.PER = True` 时，模型会在回放经验（从经验回放缓冲区中采样经验用于训练）时，优先选择那些对模型来说更“意外”的样本进行学习。这些意外样本通常是模型预测误差较大的样本，可能包含对模型更有价值的学习信息。
-             - **标准经验回放**: 如果 `self.PER = False`，模型则会使用标准的经验回放，随机均匀地从经验回放缓冲区中采样样本进行训练。这样每个样本被选中的概率相同，不考虑样本的重要性。
-        
-           - **优先经验回放的好处**:
-             - 加速学习：通过优先学习那些对当前策略影响最大的经验，可以加速模型的学习进程。
-             - 更高效的样本利用：避免模型浪费时间在那些对当前策略提升作用较小的样本上。
-        
-        ### 2. **`self.PER_alpha`**:
-           - **定义**: `self.PER_alpha` 控制优先经验回放中的**优先化程度**，其值在 0 到 1 之间。
-           - **作用**:
-             - **优先化程度**: `PER_alpha` 决定了优先经验回放中样本被选中的优先化程度。值为 0 时，优先经验回放退化为均匀随机采样，即没有优先化；值为 1 时，优先化程度达到最大，样本被选中的概率完全由它们的优先级（通常是 TD 误差）决定。
-             - **影响采样策略**: 当 `self.PER_alpha` 较高时（接近1），模型将更倾向于选择那些 TD 误差大的样本进行学习，这些样本通常对当前策略的改进更有价值；当 `self.PER_alpha` 较低时（接近0），模型将更接近于随机采样，从而保持采样的多样性。
-        
-           - **配置建议**:
-             - **高优先化（`PER_alpha` 接近1）**: 更适合在稳定且成熟的模型阶段，以最大化利用那些难以预测或误差大的样本。
-             - **低优先化（`PER_alpha` 接近0）**: 更适合在训练初期，以确保模型对环境有更全面的探索，避免陷入局部最优。
-        
-        ### 例子：
-        假设你在训练一个自动驾驶模型，其中一些状态-动作对（如紧急刹车）对策略的改进至关重要。如果 `self.PER = True` 且 `self.PER_alpha` 接近 1，模型会更频繁地采样这些关键状态，以加快学习速度并提高模型对这些关键决策的准确性。
-        
-        ### 总结：
-        - **`self.PER`**：控制是否启用优先经验回放，启用后模型会更频繁地学习那些对其策略影响最大的样本。
-        - **`self.PER_alpha`**：控制优先经验回放中的优先化程度，值越高，样本的选择越依赖其优先级，有助于更高效地利用经验样本。
-        """
         self.PER = True  # Prioritized Replay (See paper appendix Training), select in priority the elements in the replay buffer which are unexpected for the network
         self.PER_alpha = 0.6  # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
 
@@ -193,7 +116,7 @@ class MuZeroConfig:
         # fmt: on
 
     def visit_softmax_temperature_fn(self, trained_steps):
-        """控制完整训练过程中的温度阈值
+        """
         Parameter to alter the visit count distribution to ensure that the action selection becomes greedier as training progresses.
         The smaller it is, the more likely the best action (ie with the highest visit count) is chosen.
 
