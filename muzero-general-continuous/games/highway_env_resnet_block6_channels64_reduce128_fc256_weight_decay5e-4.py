@@ -27,10 +27,10 @@ class MuZeroConfig:
         self.opponent = None  # MuZero 面对的对手，用于评估在多人游戏中的进展。可以是 "random" 或 "expert"，如果在游戏类中实现了对手
 
         # Self-Play
-        self.num_workers = 2  # 定义了同时进行 Self-Play 的工作线程数量，这些线程负责生成训练样本并将其存储到回放缓冲区中。
+        self.num_workers = 6  # 定义了同时进行 Self-Play 的工作线程数量，这些线程负责生成训练样本并将其存储到回放缓冲区中。
         self.selfplay_on_gpu = False  # 是否在gpu进行自我博弈,打开后速度变快,但是显存开支会高很多
-        self.max_moves = 100  # 每场游戏的最大游戏次数,未发生碰撞,或者没有达到这个次数,单场游戏都不停止
-        self.num_simulations = 35  # 执行指定次数的模拟，每次模拟从根节点开始进行搜索和更新,
+        self.max_moves = 50  # 每场游戏的最大游戏次数,未发生碰撞,或者没有达到这个次数,单场游戏都不停止
+        self.num_simulations = 50  # 执行指定次数的模拟，每次模拟从根节点开始进行搜索和更新,
         """
         discount 参数对 Total Reward 曲线的影响可以从以下几个方面来理解：
         (1)未来回报的重要性：
@@ -44,21 +44,21 @@ class MuZeroConfig:
         较大的 discount：Total Reward 的上升可能是逐步且持久的，因为模型能够逐步发现并利用长期的策略，最终获得更高的总回报。
         总结：discount 值的选择会影响 Total Reward 曲线的上升速度、平滑度和最终的总回报。一般情况下，较大的 discount 值能带来更稳定、更长期的回报，Total Reward 曲线更平滑且在后期继续上升。较小的 discount 值则可能带来更快的初期收益，但容易波动，并且总回报可能较低。
         """
-        self.discount = 0.985  # 长期回报的折扣因子
-        self.temperature_threshold = 500  # 单次play_games的温度阈值,当前的play_games内,最大移动self.max_moves次,moves的次数超过这个阈值后,温度直接为0,低于这个次数时,启用visit_softmax_temperature_fn获取温度数值
+        self.discount = 0.997  # 长期回报的折扣因子
+        self.temperature_threshold = None  # 单次play_games的温度阈值,当前的play_games内,最大移动self.max_moves次,moves的次数超过这个阈值后,温度直接为0,低于这个次数时,启用visit_softmax_temperature_fn获取温度数值
         # 'uniform' or 'density'
         # 在自动驾驶换道场景下：如果你希望模型重点考虑某些特定的换道策略（比如避免某些危险的换道动作），选择 density。
         # 如果你希望模型自行探索各种可能的换道策略，选择 uniform。
         self.node_prior = 'uniform'
 
         # UCB formula
-        self.pb_c_base = 10600  # 数值越大,更倾向于利用选择已知效果较好的动作,而非探索新动作
-        self.pb_c_init = 1.2  # 初始化参数,对探索奖励有一个固定的提升作用.数值越大,初期的探索越多.反之更依赖已知动作
+        self.pb_c_base = 19650  # 数值越大,更倾向于利用选择已知效果较好的动作,而非探索新动作
+        self.pb_c_init = 1.25  # 初始化参数,对探索奖励有一个固定的提升作用.数值越大,初期的探索越多.反之更依赖已知动作
 
         # Progressive widening parameter
         # pw_alpha用来调节何时对节点进行渐进扩展。渐进扩展的基本思想是，当一个节点的访问次数较少时，增加它的子节点的数量以增加探索的多样性，
         # 从而避免过早地确定子节点的评估结果。
-        self.pw_alpha = 0.4
+        self.pw_alpha = 0.49
 
         # network_config2
         self.network = "resnet"
@@ -70,9 +70,9 @@ class MuZeroConfig:
         self.reduced_channels_value = 128  # Number of channels in value head
         self.reduced_channels_policy = 128  # Number of channels in policy head
         # Define hidden layers (example)
-        self.resnet_fc_reward_layers = [256, 256]  # Hidden layers for reward head
-        self.resnet_fc_value_layers = [256, 256]  # Hidden layers for value head
-        self.resnet_fc_policy_layers = [256, 256]
+        self.resnet_fc_reward_layers = [128, 128]  # Hidden layers for reward head
+        self.resnet_fc_value_layers = [128, 128]  # Hidden layers for value head
+        self.resnet_fc_policy_layers = [128, 128]
         # Hidden layers for policy head # Define the hidden layers in the policy head of the prediction network
         self.support_size = 15  # Value and reward are scaled (with almost sqrt) and encoded on a vector with a range of -support_size to support_size
         self.downsample = "resnet"  # Downsample observations before representation network, False / "CNN" (lighter) / "resnet" (See paper appendix Network Architecture)
@@ -87,7 +87,7 @@ class MuZeroConfig:
         # 整体训练轮次
         self.training_steps = 20000  # Total number of training steps (ie weights update according to a batch)
         # batch size大小
-        self.batch_size = 256  # Number of parts of games to train on at each training step
+        self.batch_size = 512  # Number of parts of games to train on at each training step
         # 多少轮保存一次数据
         self.checkpoint_interval = 10  # Number of training steps before using the model for self-playing
         """
@@ -124,7 +124,7 @@ class MuZeroConfig:
         这个参数的配置对模型捕捉时间相关性和优化长期决策非常关键。
         选择合适的 num_unroll_steps 可以帮助模型更好地理解和预测未来的状态和奖励，从而提升训练效果和决策质量。
         """
-        self.num_unroll_steps = 15  # 每个批次中保留多少数量的moves的数据
+        self.num_unroll_steps = 5  # 每个批次中保留多少数量的moves的数据
         """
         例子：
         假设在一个自动驾驶任务中，车辆需要计划如何通过一个复杂的交通路口。设置 td_steps 为 5 意味着模型将根据未来的 
@@ -133,7 +133,7 @@ class MuZeroConfig:
         td_steps 是一个控制时间差分更新步数的参数，用于决定在计算当前状态的目标价值时，要向未来看多少步。
         它影响了模型在短期与长期回报之间的权衡，配置合适的 td_steps 对于提升模型的表现至关重要。
         """
-        self.td_steps = 50  # Number of steps in the future to take into account for calculating the target value
+        self.td_steps = 10  # Number of steps in the future to take into account for calculating the target value
         """
         这两个参数 `self.PER` 和 `self.PER_alpha` 与**优先经验回放（Prioritized Experience Replay, PER）**相关，这是强化学习中用于提高样本效率和加快收敛的一种技术。
         ### 1. **`self.PER`**: 
@@ -198,24 +198,24 @@ class Game(AbstractGame):
     """
 
     def __init__(self, seed=None):
-        self.env = gym.make('highway-v0', render_mode="rgb_array",
+        self.env = gym.make('highway-fast-v0', render_mode="rgb_array",
                             config={  # 需要在程序启动这个观测器之前使用自定义的公式来对观测车辆的初始速度和初始位置进行初始化
                                 'observation': {"type": "Kinematics",  # 使用这个观测器作为状态空间，可以获取观测车辆位置、观测车辆速度和观测车辆转向角
                                                 "vehicles_count": 21,  # 20辆周围车辆
                                                 "features": ["presence", "x", "y", "vx", "vy"],
-                                                "features_range": {
-                                                    "x": [-100, 100],
-                                                    "y": [-100, 100],
-                                                    "vx": [-20, 20],
-                                                    "vy": [-20, 20]
-                                                },
+                                                # "features_range": {
+                                                #     "x": [-100, 100],
+                                                #     "y": [-100, 100],
+                                                #     "vx": [-20, 20],
+                                                #     "vy": [-20, 20]
+                                                # },
                                                 # 控制状态空间包括转向角
                                                 "absolute": True,  # 使用相对坐标，相对于观测车辆。为True时使用相对于环境的全局坐标系。
                                                 "order": "sorted"  # 根据与自车的距离从近到远排列。这种排列方式使得观测数组的顺序保持稳定
                                                 },
                                 'action': {'type': 'ContinuousAction',
-                                           'acceleration_range': (-4, 4.0),
-                                           'steering_range': (-np.pi / 8, np.pi / 8)},  # 为它扩展一个能够控制横向加速度和纵向加速度的子类
+                                           'acceleration_range': (-4, 4.0)},
+                                        #    'steering_range': (-np.pi / 8, np.pi / 8)},  # 为它扩展一个能够控制横向加速度和纵向加速度的子类
                                 'simulation_frequency': 15,  # 模拟频率
                                 'policy_frequency': 5,  # 策略频率
                                 # 纵向决策：IDM（智能驾驶模型）根据前车的距离和速度计算出加速度。
@@ -237,9 +237,9 @@ class Game(AbstractGame):
                                 'ego_spacing': 1.5,  # 表示控制车辆（ego vehicle）与前一辆车之间的初始间隔距离。它用来设置在创建控制车辆时的车间距
                                 'vehicles_density': 1,
                                 "right_lane_reward": 0.5,  # 在最右边的车道上行驶时获得的奖励，在其他车道上线性映射为零。
-                                'collision_reward': -2,  # 与车辆相撞时获取的惩罚
-                                'high_speed_reward': 0.5,  # 维持高速行驶的奖励
-                                'lane_change_reward': -3,  # 换道的惩罚
+                                'collision_reward': -1.5,  # 与车辆相撞时获取的惩罚
+                                'high_speed_reward': 1,  # 维持高速行驶的奖励
+                                'lane_change_reward': -0.5,  # 换道的惩罚
                                 'reward_speed_range': [20, 30],  # 高速的奖励从这个范围线性映射到[0,HighwayEnv.HIGH_SPEED_REWARD]。
                                 'offroad_terminal': False  # 车辆偏离道路是否会导致仿真结束
                             })

@@ -53,7 +53,7 @@ class HighwayEnv(AbstractEnv):
                 # lower speeds according to config["reward_speed_range"].
                 "lane_change_reward": 0,  # The reward received at each lane change action.
                 "reward_speed_range": [20, 30],
-                "normalize_reward": False,
+                "normalize_reward": True,
                 "offroad_terminal": False,
             }
         )
@@ -166,7 +166,7 @@ class HighwayEnv(AbstractEnv):
             # print("看一下新的state：",self.vehicle.lane_index,self.vehicle.position)
             # print(f"恢复后是否在车道上: {self.vehicle.on_road}")
             # self._restore_vehicle_state(self.previous_state)
-            rewards["lane_change_reward"] = -5.0  # 更大的越界惩罚
+            rewards["lane_change_reward"] = -3.0  # 更大的越界惩罚
 
         reward = sum(
             self.config.get(name, 0) * reward for name, reward in rewards.items()

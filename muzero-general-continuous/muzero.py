@@ -669,7 +669,7 @@ if __name__ == "__main__":
             elif choice == 2:
                 muzero.test(render=True, opponent="self", muzero_player=None)
             elif choice == 3:
-                muzero.test(render=False, opponent="human", muzero_player=0)
+                muzero.test(render=True, opponent="human", muzero_player=0)
             elif choice == 4:
                 env = muzero.Game()
                 env.reset()
