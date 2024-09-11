@@ -184,7 +184,7 @@ class SelfPlay:
                 # Choose the action如果 opponent 是 "self" 或者当前轮到的玩家是 muzero_player，则通过蒙特卡洛树搜索（MCTS）选择行动
                 if opponent == "self" or muzero_player == self.game.to_play():
                     # 初始化蒙特卡洛树，并返回根节点和蒙特卡洛树的其他信息
-                    # logger.info(f"初始化树{datetime.datetime.now()}")
+                    logger.info(f"初始化树{datetime.datetime.now()}")
                     root, mcts_info = mcts.run(
                         self.model,
                         stacked_observations,
@@ -192,7 +192,7 @@ class SelfPlay:
                         render,
                     )
                     # 根据 MCTS 的结果遍历树选择一个action
-                    # logger.info(f"单步规划时间：{datetime.datetime.now()}")
+                    # logger.info(f"单步规划时间1：{datetime.datetime.now()}")
                     action = self.select_action(
                         root,
                         temperature
@@ -200,7 +200,14 @@ class SelfPlay:
                            or len(game_history.action_history) < temperature_threshold
                         else 0,
                     )
-                    # logger.info(f"单步规划时间结果{datetime.datetime.now()}")
+                    obs_car_line_id = int(observation[0][0][2]/0.25)
+                    # logger.info(f"观测车辆车道编号{obs_car_line_id} 观测车辆的车道角度1：{type(action.value[1])}{action.value[1]}")
+                    if obs_car_line_id == 0 and action.value[1] < 0:
+                        action.value[1] = -action.value[1]
+                    if obs_car_line_id == 3 and action.value[1] > 0:
+                        action.value[1] = -action.value[1]
+                    logger.info(f"单步规划时间2：{datetime.datetime.now()}")
+                    # logger.info(f"观测车辆车道编号{obs_car_line_id} 观测车辆的车道角度2：{type(action.value[1])}{action.value[1]}")
                     if render:  # 渲染模式打印日志结果
                         logger.info(f'Tree depth: {mcts_info["max_tree_depth"]}')
                         logger.info(f"Root value for player {self.game.to_play()}: {root.value():.2f}")

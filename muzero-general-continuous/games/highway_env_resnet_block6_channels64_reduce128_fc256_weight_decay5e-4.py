@@ -63,16 +63,16 @@ class MuZeroConfig:
         # network_config2
         self.network = "resnet"
         # Residual Network
-        self.blocks = 6  # Number of blocks in the ResNet
-        self.channels = 64  # Number of channels in the ResNet
+        self.blocks = 3  # Number of blocks in the ResNet
+        self.channels = 32  # Number of channels in the ResNet
         # Define channels for each head
-        self.reduced_channels_reward = 128  # Number of channels in reward head
-        self.reduced_channels_value = 128  # Number of channels in value head
-        self.reduced_channels_policy = 128  # Number of channels in policy head
+        self.reduced_channels_reward = 64  # Number of channels in reward head
+        self.reduced_channels_value = 64  # Number of channels in value head
+        self.reduced_channels_policy = 64  # Number of channels in policy head
         # Define hidden layers (example)
-        self.resnet_fc_reward_layers = [128, 128]  # Hidden layers for reward head
-        self.resnet_fc_value_layers = [128, 128]  # Hidden layers for value head
-        self.resnet_fc_policy_layers = [128, 128]
+        self.resnet_fc_reward_layers = [64, 64]  # Hidden layers for reward head
+        self.resnet_fc_value_layers = [64, 64]  # Hidden layers for value head
+        self.resnet_fc_policy_layers = [64, 64]
         # Hidden layers for policy head # Define the hidden layers in the policy head of the prediction network
         self.support_size = 15  # Value and reward are scaled (with almost sqrt) and encoded on a vector with a range of -support_size to support_size
         self.downsample = "resnet"  # Downsample observations before representation network, False / "CNN" (lighter) / "resnet" (See paper appendix Network Architecture)
@@ -211,11 +211,12 @@ class Game(AbstractGame):
                                                 # },
                                                 # 控制状态空间包括转向角
                                                 "absolute": True,  # 使用相对坐标，相对于观测车辆。为True时使用相对于环境的全局坐标系。
-                                                "order": "sorted"  # 根据与自车的距离从近到远排列。这种排列方式使得观测数组的顺序保持稳定
+                                                "order": "sorted",
+                                                "normalize": True,# 根据与自车的距离从近到远排列。这种排列方式使得观测数组的顺序保持稳定
                                                 },
                                 'action': {'type': 'ContinuousAction',
-                                           'acceleration_range': (-4, 4.0)},
-                                        #    'steering_range': (-np.pi / 8, np.pi / 8)},  # 为它扩展一个能够控制横向加速度和纵向加速度的子类
+                                           'acceleration_range': (-4, 4.0),
+                                           'steering_range': (-np.pi / 12, np.pi / 12)},  # 为它扩展一个能够控制横向加速度和纵向加速度的子类
                                 'simulation_frequency': 15,  # 模拟频率
                                 'policy_frequency': 5,  # 策略频率
                                 # 纵向决策：IDM（智能驾驶模型）根据前车的距离和速度计算出加速度。
@@ -225,10 +226,10 @@ class Game(AbstractGame):
                                 'centering_position': [0.3, 0.5],  # 初始缩放比例
                                 'scaling': 5.5,  # 偏移量
                                 'show_trajectories': False,  # 是否记录车辆最近的轨迹并显示
-                                'render_agent': True,  # 控制渲染是否应用到屏幕
+                                'render_agent': False,  # 控制渲染是否应用到屏幕
                                 'offscreen_rendering': False,  # 当前的渲染是否是在屏幕外进行的。如果为False，意味着渲染是在屏幕上进行的，
                                 'manual_control': False,  # 是否允许键盘控制观测车辆
-                                'real_time_rendering': True,  # 是否实时渲染画面
+                                'real_time_rendering': False,  # 是否实时渲染画面
                                 'lanes_count': 4,  # 车道数量
                                 # 'normalize_reward': True,
                                 'controlled_vehicles': 1,  # 一次只控制一辆车
@@ -241,7 +242,7 @@ class Game(AbstractGame):
                                 'high_speed_reward': 1,  # 维持高速行驶的奖励
                                 'lane_change_reward': -0.5,  # 换道的惩罚
                                 'reward_speed_range': [20, 30],  # 高速的奖励从这个范围线性映射到[0,HighwayEnv.HIGH_SPEED_REWARD]。
-                                'offroad_terminal': False  # 车辆偏离道路是否会导致仿真结束
+                                'offroad_terminal': True  # 车辆偏离道路是否会导致仿真结束
                             })
         self.seed = seed
         self.env.reset()
@@ -284,10 +285,10 @@ class Game(AbstractGame):
         """
         Display the game observation.
         """
-        logger.info(f"start render step: {datetime.datetime.now()}")
+        # logger.info(f"start render step: {datetime.datetime.now()}")
         self.env.render()
-        logger.info(f"end render step: {datetime.datetime.now()}")
-        time.sleep(3)
+        # logger.info(f"end render step: {datetime.datetime.now()}")
+        # time.sleep(3)
 
     def render_rgb(self):
         rgb_img = self.env.render()

@@ -1,11 +1,21 @@
-import gymnasium
+import gymnasium as gym
 import highway_env
-from matplotlib import pyplot as plt
-# %matplotlib inline
 
-env = gymnasium.make('highway-v0', render_mode='rgb_array')
-env.reset()
-for _ in range(3):
-    action = env.unwrapped.action_type.actions_indexes["IDLE"]
-    obs, reward, done, truncated, info = env.step(action)
-    env.render()
+config = {
+    "observation": {
+        "type": "Kinematics",
+        "vehicles_count": 15,
+        "features": ["presence", "x", "y", "vx", "vy"],
+        "absolute": True,
+        "order": "sorted",
+        "normalize": True,
+        },
+    'action': {'type': 'ContinuousAction',
+               'acceleration_range': (-4, 4.0)},
+    'screen_width': 900,  # 屏幕宽度
+    'screen_height': 600,  # 屏幕高度
+    'render_agent': True,  # 控制渲染是否应用到屏幕
+}
+env = gym.make('highway-v0', render_mode="rgb_array", config=config)
+obs, info = env.reset()
+rgb_img = env.render()
