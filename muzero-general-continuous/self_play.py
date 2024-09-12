@@ -200,7 +200,7 @@ class SelfPlay:
                            or len(game_history.action_history) < temperature_threshold
                         else 0,
                     )
-                    obs_car_line_id = int(observation[0][0][2]/0.25)
+                    obs_car_line_id = int(observation[0][0][2]/4)
                     # logger.info(f"观测车辆车道编号{obs_car_line_id} 观测车辆的车道角度1：{type(action.value[1])}{action.value[1]}")
                     if obs_car_line_id == 0 and action.value[1] < 0:
                         action.value[1] = -action.value[1]
