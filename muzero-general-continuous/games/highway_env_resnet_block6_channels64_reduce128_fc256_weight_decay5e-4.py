@@ -17,7 +17,7 @@ class MuZeroConfig:
         self.max_num_gpus = None  # 固定使用gpu的最大数量.使用单个gpu会更快,没有配置的话会默认使用所有gpu
 
         # Game
-        self.observation_shape = (1, 21, 5)  # 游戏观测空间的维度,如果观测空间三维无所谓,如果是一维,需要配成(1,1,x)
+        self.observation_shape = (1, 21, 6)  # 游戏观测空间的维度,如果观测空间三维无所谓,如果是一维,需要配成(1,1,x)
         self.action_space = 2  # 动作空间的大小
         self.players = [i for i in range(1)]  # 玩家的数量,车辆换道场景观测和控制车辆只有一个,为1就行
         self.stacked_observations = 0  # 观测时叠加的历史观察数量（包括过去的动作）。
@@ -202,7 +202,7 @@ class Game(AbstractGame):
                             config={  # 需要在程序启动这个观测器之前使用自定义的公式来对观测车辆的初始速度和初始位置进行初始化
                                 'observation': {"type": "Kinematics",  # 使用这个观测器作为状态空间，可以获取观测车辆位置、观测车辆速度和观测车辆转向角
                                                 "vehicles_count": 21,  # 20辆周围车辆
-                                                "features": ["presence", "x", "y", "vx", "vy"],
+                                                "features": ["presence", "x", "y", "vx", "vy", "heading"],
                                                 # "features_range": {
                                                 #     "x": [-100, 100],
                                                 #     "y": [-100, 100],
@@ -212,13 +212,13 @@ class Game(AbstractGame):
                                                 # 控制状态空间包括转向角
                                                 "absolute": True,  # 使用相对坐标，相对于观测车辆。为True时使用相对于环境的全局坐标系。
                                                 "order": "sorted",
-                                                "normalize": True,# 根据与自车的距离从近到远排列。这种排列方式使得观测数组的顺序保持稳定
+                                                "normalize": False,# 根据与自车的距离从近到远排列。这种排列方式使得观测数组的顺序保持稳定
                                                 },
                                 'action': {'type': 'ContinuousAction',
                                            'acceleration_range': (-4, 4.0),
                                            'steering_range': (-np.pi / 12, np.pi / 12)},  # 为它扩展一个能够控制横向加速度和纵向加速度的子类
-                                'simulation_frequency': 15,  # 模拟频率
-                                'policy_frequency': 5,  # 策略频率
+                                'simulation_frequency': 24,  # 模拟频率
+                                'policy_frequency': 8,  # 策略频率
                                 # 纵向决策：IDM（智能驾驶模型）根据前车的距离和速度计算出加速度。
                                 'other_vehicles_type': 'highway_env.vehicle.behavior.IDMVehicle',
                                 'screen_width': 600,  # 屏幕宽度
@@ -259,7 +259,7 @@ class Game(AbstractGame):
             The new observation, the reward and a boolean if the game has ended.
         """
         # logger.info(f"start step: {datetime.datetime.now()}")
-        action = numpy.tanh(action)
+        # action = numpy.tanh(action)
         observation, reward, done, _, _ = self.env.step(action)
         # observation = observation.reshape((147,))
 
@@ -277,7 +277,7 @@ class Game(AbstractGame):
 
         # Reshape the observation to 3D (1, 1, -1)
         observation = np.array(observation)
-        observation = observation.reshape((1, 21, 5))
+        observation = observation.reshape((1, 21, 6))
         # logger.info(f"Observation2 reset shape after step:{type(observation)}-shape-{observation.shape}")
         return observation
 
