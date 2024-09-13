@@ -17,8 +17,8 @@ class MuZeroConfig:
         self.max_num_gpus = None  # 固定使用gpu的最大数量.使用单个gpu会更快,没有配置的话会默认使用所有gpu
 
         # Game
-        self.observation_shape = (1, 21, 6)  # 游戏观测空间的维度,如果观测空间三维无所谓,如果是一维,需要配成(1,1,x)
-        self.action_space = 2  # 动作空间的大小
+        self.observation_shape = (1, 21, 5)  # 游戏观测空间的维度,如果观测空间三维无所谓,如果是一维,需要配成(1,1,x)
+        self.action_space = 1 # 动作空间的大小
         self.players = [i for i in range(1)]  # 玩家的数量,车辆换道场景观测和控制车辆只有一个,为1就行
         self.stacked_observations = 0  # 观测时叠加的历史观察数量（包括过去的动作）。
 
@@ -64,15 +64,15 @@ class MuZeroConfig:
         self.network = "resnet"
         # Residual Network
         self.blocks = 3  # Number of blocks in the ResNet
-        self.channels = 32  # Number of channels in the ResNet
+        self.channels = 64  # Number of channels in the ResNet
         # Define channels for each head
-        self.reduced_channels_reward = 64  # Number of channels in reward head
-        self.reduced_channels_value = 64  # Number of channels in value head
-        self.reduced_channels_policy = 64  # Number of channels in policy head
+        self.reduced_channels_reward = 32  # Number of channels in reward head
+        self.reduced_channels_value = 32  # Number of channels in value head
+        self.reduced_channels_policy = 32  # Number of channels in policy head
         # Define hidden layers (example)
-        self.resnet_fc_reward_layers = [64, 64]  # Hidden layers for reward head
-        self.resnet_fc_value_layers = [64, 64]  # Hidden layers for value head
-        self.resnet_fc_policy_layers = [64, 64]
+        self.resnet_fc_reward_layers = [32]  # Hidden layers for reward head
+        self.resnet_fc_value_layers = [32]  # Hidden layers for value head
+        self.resnet_fc_policy_layers = [32]
         # Hidden layers for policy head # Define the hidden layers in the policy head of the prediction network
         self.support_size = 15  # Value and reward are scaled (with almost sqrt) and encoded on a vector with a range of -support_size to support_size
         self.downsample = "resnet"  # Downsample observations before representation network, False / "CNN" (lighter) / "resnet" (See paper appendix Network Architecture)
@@ -104,7 +104,7 @@ class MuZeroConfig:
         """
         self.train_on_gpu = torch.cuda.is_available()  # Train on GPU if available
         self.optimizer = "AdamW"  # "Adam" or "SGD". Paper uses SGD
-        self.weight_decay = 5e-4  # L2 weights regularization
+        self.weight_decay = 1e-4  # L2 weights regularization
         self.momentum = 0.9  # Used only if optimizer is SGD
 
         # Exponential learning rate schedule
@@ -113,7 +113,7 @@ class MuZeroConfig:
         self.lr_decay_steps = 1000
 
         ### Replay Buffer
-        self.replay_buffer_size = 5000  # 缓存空间中记录的自我监督的数据数量,给高了的话,容易引入噪声,如果给低了,性能不佳不稳定
+        self.replay_buffer_size = int(1e6)  # 缓存空间中记录的自我监督的数据数量,给高了的话,容易引入噪声,如果给低了,性能不佳不稳定
         """
         举个例子：
         假设你在训练一个自动驾驶模型，在模拟中车辆经过一个弯道。设置 self.num_unroll_steps = 15 
@@ -202,7 +202,7 @@ class Game(AbstractGame):
                             config={  # 需要在程序启动这个观测器之前使用自定义的公式来对观测车辆的初始速度和初始位置进行初始化
                                 'observation': {"type": "Kinematics",  # 使用这个观测器作为状态空间，可以获取观测车辆位置、观测车辆速度和观测车辆转向角
                                                 "vehicles_count": 21,  # 20辆周围车辆
-                                                "features": ["presence", "x", "y", "vx", "vy", "heading"],
+                                                "features": ["presence", "x", "y", "vx", "vy"],
                                                 # "features_range": {
                                                 #     "x": [-100, 100],
                                                 #     "y": [-100, 100],
@@ -214,11 +214,12 @@ class Game(AbstractGame):
                                                 "order": "sorted",
                                                 "normalize": False,# 根据与自车的距离从近到远排列。这种排列方式使得观测数组的顺序保持稳定
                                                 },
-                                'action': {'type': 'ContinuousAction',
-                                           'acceleration_range': (-4, 4.0),
-                                           'steering_range': (-np.pi / 12, np.pi / 12)},  # 为它扩展一个能够控制横向加速度和纵向加速度的子类
-                                'simulation_frequency': 24,  # 模拟频率
-                                'policy_frequency': 8,  # 策略频率
+                                'action': {'type': 'DiscreteMetaAction'},
+                                # 'action': {'type': 'ContinuousAction',
+                                #            'acceleration_range': (-4, 4.0),
+                                #            'steering_range': (-np.pi / 12, np.pi / 12)},  # 为它扩展一个能够控制横向加速度和纵向加速度的子类
+                                'simulation_frequency': 15,  # 模拟频率
+                                'policy_frequency': 1,  # 策略频率
                                 # 纵向决策：IDM（智能驾驶模型）根据前车的距离和速度计算出加速度。
                                 'other_vehicles_type': 'highway_env.vehicle.behavior.IDMVehicle',
                                 'screen_width': 600,  # 屏幕宽度
@@ -277,7 +278,7 @@ class Game(AbstractGame):
 
         # Reshape the observation to 3D (1, 1, -1)
         observation = np.array(observation)
-        observation = observation.reshape((1, 21, 6))
+        observation = observation.reshape((1, 21, 5))
         # logger.info(f"Observation2 reset shape after step:{type(observation)}-shape-{observation.shape}")
         return observation
 

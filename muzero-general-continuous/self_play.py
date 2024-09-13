@@ -210,23 +210,25 @@ class SelfPlay:
                            or len(game_history.action_history) < temperature_threshold
                         else 0,
                     )
-                    obs_car_line_value = observation[0][0][2]
-                    # 获取观测车辆的 y 坐标（第一行的第三列）
-                    ego_vehicle_y = observation[0, 0, 2]
-                    ego_lane = get_lane(ego_vehicle_y)
-                    # 过滤出存在于观测空间的车辆（第一列为 1）
-                    present_cars = observation[0, observation[0, :, 0] == 1]
-                    # 检查是否存在与观测车辆在同一车道的车辆
-                    same_lane_exists = any(get_lane(car[2]) == ego_lane for car in present_cars)
-                    if obs_car_line_value < 4 and action.value[1] < 0:  # 在第一车道并且尝试左拐，改成右拐
-                        action.value[1] = -action.value[1]
-                    if obs_car_line_value > 12 and action.value[1] > 0:  # 在第四车道并且尝试右拐，改成左拐
-                        action.value[1] = -action.value[1]
-                    if not same_lane_exists:  # 没车辆和它在相同车道，不拐
-                        action.value[1] = 0
-                    logger.info(f"{observation}----{action.value}")
+                    # obs_car_line_value = observation[0][0][2]
+                    # # 获取观测车辆的 y 坐标（第一行的第三列）
+                    # ego_vehicle_y = observation[0, 0, 2]
+                    # ego_lane = get_lane(ego_vehicle_y)
+                    # # 过滤出存在于观测空间的车辆（第一列为 1）
+                    # present_cars = observation[0, observation[0, :, 0] == 1]
+                    # # 检查是否存在与观测车辆在同一车道的车辆
+                    # same_lane_exists = any(get_lane(car[2]) == ego_lane for car in present_cars)
+                    # logger.info(f"观测车辆车道坐标1{obs_car_line_value} 观测车辆的车道角度2：{type(action.value[1])}{action.value[1]}")
+                    #
+                    # if obs_car_line_value < 4 and action.value[1] < 0:  # 在第一车道并且尝试左拐，改成右拐
+                    #     action.value[1] = -action.value[1]
+                    # if obs_car_line_value > 12 and action.value[1] > 0:  # 在第四车道并且尝试右拐，改成左拐
+                    #     action.value[1] = -action.value[1]
+                    # if not same_lane_exists:  # 没车辆和它在相同车道，不拐
+                    #     action.value[1] = 0
+                    # logger.info(f"{observation}----{action.value}")
                     # logger.info(f"单步规划时间2：{datetime.datetime.now()}")
-                    # logger.info(f"观测车辆车道坐标{obs_car_line_value} 观测车辆的车道角度2：{type(action.value[1])}{action.value[1]}")
+                    # logger.info(f"观测车辆车道坐标2{obs_car_line_value} 观测车辆的车道角度2：{type(action.value[1])}{action.value[1]}")
                     if render:  # 渲染模式打印日志结果
                         logger.info(f'Tree depth: {mcts_info["max_tree_depth"]}')
                         logger.info(f"Root value for player {self.game.to_play()}: {root.value():.2f}")
