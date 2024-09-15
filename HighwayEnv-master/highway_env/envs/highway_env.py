@@ -175,7 +175,7 @@ class HighwayEnv(AbstractEnv):
             reward = utils.lmap(
                 reward,
                 [
-                    self.config["collision_reward"],
+                    self.config["collision_reward"] + self.config["lane_change_reward"],
                     self.config["high_speed_reward"] + self.config["right_lane_reward"],
                 ],
                 [0, 1],
@@ -189,24 +189,25 @@ class HighwayEnv(AbstractEnv):
             if isinstance(self.vehicle, ControlledVehicle)
             else self.vehicle.lane_index[2]
         )
-        # print("让我看看config里都有啥：",self.config)
+        # Use forward speed rather than speed, see https://github.com/eleurent/highway-env/issues/268
+        # forward_speed = self.vehicle.speed * np.cos(self.vehicle.heading)
+        # scaled_speed = utils.lmap(
+        #     forward_speed, self.config["reward_speed_range"], [0, 1]
+        # )
+        # high_speed_reward = np.clip(scaled_speed, 0, 1)  # 保证结果在 [0, 1] 范围内
         v_min, v_max = self.config["reward_speed_range"]
         # Use forward speed rather than speed, see https://github.com/eleurent/highway-env/issues/268
         forward_speed = self.vehicle.speed * np.cos(self.vehicle.heading)
-        scaled_speed = utils.lmap(
-            forward_speed, self.config["reward_speed_range"], [0, 1]
-        )
-        high_speed_reward = np.clip(scaled_speed, 0, 1)  # 保证结果在 [0, 1] 范围内
-
+        high_speed_reward = -1 + (forward_speed - v_min) / (v_max - v_min)
+        high_speed_reward = np.clip(high_speed_reward, -1, 1)  # 保证结果在 [-1, 1] 范围内
+        # 判断是否进行了换道操作
         # 判断是否进行了换道操作并且保持在道路上
         lane_change_reward = 0
         if hasattr(self.vehicle, 'last_lane_index'):
             if self.vehicle.lane_index[2] != self.vehicle.last_lane_index:
                 lane_change_reward = self.config["lane_change_reward"]
-
         # 更新 last_lane_index
         self.vehicle.last_lane_index = self.vehicle.lane_index[2]
-        logger.info(f"测试")
         # 计算并返回各项奖励
         return {
             "collision_reward": float(self.vehicle.crashed),

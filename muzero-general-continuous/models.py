@@ -140,7 +140,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
 
     def prediction(self, encoded_state):
         # self.prediction_value_network.to("cpu")
-        self.prediction_value_network.to("cuda:0" if torch.cuda.is_available() else "cpu")
+        # self.prediction_value_network.to("cuda:0" if torch.cuda.is_available() else "cpu")
         mu = self.prediction_policy_mu_network(encoded_state)
         log_std = self.prediction_policy_logstd_network(encoded_state)
         log_std = torch.clamp(log_std, *self.log_std_clamp)
@@ -148,7 +148,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         return mu, log_std, value
 
     def representation(self, observation):
-        self.representation_network.to("cuda:0" if torch.cuda.is_available() else "cpu")
+        # self.representation_network.to("cuda:0" if torch.cuda.is_available() else "cpu")
         # self.representation_network.to("cpu")
 
         encoded_state = self.representation_network(
@@ -512,7 +512,7 @@ class MuZeroResidualNetwork(AbstractNetwork):
                 num_blocks,
                 num_channels,
                 downsample,
-            ).to("cuda:0" if torch.cuda.is_available() else "cpu")
+            )
         self.representation_network = torch.nn.DataParallel(
             networks
         )
@@ -545,14 +545,14 @@ class MuZeroResidualNetwork(AbstractNetwork):
         )
 
     def prediction(self, encoded_state):
-        self.prediction_network.to("cuda:0" if torch.cuda.is_available() else "cpu")
+        # self.prediction_network.to("cuda:0" if torch.cuda.is_available() else "cpu")
         mu, log_std, value = self.prediction_network(encoded_state)
         return mu, log_std, value
 
     def representation(self, observation):
         # logger.info(f"{next(self.representation_network.parameters()).device}")
         # logger.info(f"{observation.device}")
-        self.representation_network.to("cuda:0" if torch.cuda.is_available() else "cpu")
+        # self.representation_network.to("cuda:0" if torch.cuda.is_available() else "cpu")
         encoded_state = self.representation_network(observation)
 
         # Scale encoded state between [0, 1] (See appendix paper Training)
@@ -597,7 +597,7 @@ class MuZeroResidualNetwork(AbstractNetwork):
         )
         action_one_hot = action[:, :, None, None] * action_one_hot
         x = torch.cat((encoded_state, action_one_hot), dim=1)
-        self.dynamics_network.to("cuda:0" if torch.cuda.is_available() else "cpu")
+        # self.dynamics_network.to("cuda:0" if torch.cuda.is_available() else "cpu")
         next_encoded_state, reward = self.dynamics_network(x)
 
         # Scale encoded state between [0, 1] (See paper appendix Training)

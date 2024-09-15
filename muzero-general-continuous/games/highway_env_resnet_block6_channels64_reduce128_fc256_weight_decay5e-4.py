@@ -1,7 +1,5 @@
 import datetime
 import pathlib
-import time
-import imageio
 import gymnasium as gym
 import numpy
 import torch
@@ -18,7 +16,7 @@ class MuZeroConfig:
 
         # Game
         self.observation_shape = (1, 21, 5)  # 游戏观测空间的维度,如果观测空间三维无所谓,如果是一维,需要配成(1,1,x)
-        self.action_space = 1 # 动作空间的大小
+        self.action_space = 2  # 动作空间的大小
         self.players = [i for i in range(1)]  # 玩家的数量,车辆换道场景观测和控制车辆只有一个,为1就行
         self.stacked_observations = 0  # 观测时叠加的历史观察数量（包括过去的动作）。
 
@@ -28,8 +26,8 @@ class MuZeroConfig:
 
         # Self-Play
         self.num_workers = 6  # 定义了同时进行 Self-Play 的工作线程数量，这些线程负责生成训练样本并将其存储到回放缓冲区中。
-        self.selfplay_on_gpu = False  # 是否在gpu进行自我博弈,打开后速度变快,但是显存开支会高很多
-        self.max_moves = 50  # 每场游戏的最大游戏次数,未发生碰撞,或者没有达到这个次数,单场游戏都不停止
+        self.selfplay_on_gpu = True  # 是否在gpu进行自我博弈,打开后速度变快,但是显存开支会高很多
+        self.max_moves = 1000  # 每场游戏的最大游戏次数,未发生碰撞,或者没有达到这个次数,单场游戏都不停止
         self.num_simulations = 50  # 执行指定次数的模拟，每次模拟从根节点开始进行搜索和更新,
         """
         discount 参数对 Total Reward 曲线的影响可以从以下几个方面来理解：
@@ -52,7 +50,7 @@ class MuZeroConfig:
         self.node_prior = 'uniform'
 
         # UCB formula
-        self.pb_c_base = 19650  # 数值越大,更倾向于利用选择已知效果较好的动作,而非探索新动作
+        self.pb_c_base = 19652  # 数值越大,更倾向于利用选择已知效果较好的动作,而非探索新动作
         self.pb_c_init = 1.25  # 初始化参数,对探索奖励有一个固定的提升作用.数值越大,初期的探索越多.反之更依赖已知动作
 
         # Progressive widening parameter
@@ -61,21 +59,17 @@ class MuZeroConfig:
         self.pw_alpha = 0.49
 
         # network_config2
-        self.network = "resnet"
-        # Residual Network
-        self.blocks = 3  # Number of blocks in the ResNet
-        self.channels = 64  # Number of channels in the ResNet
-        # Define channels for each head
-        self.reduced_channels_reward = 32  # Number of channels in reward head
-        self.reduced_channels_value = 32  # Number of channels in value head
-        self.reduced_channels_policy = 32  # Number of channels in policy head
-        # Define hidden layers (example)
-        self.resnet_fc_reward_layers = [32]  # Hidden layers for reward head
-        self.resnet_fc_value_layers = [32]  # Hidden layers for value head
-        self.resnet_fc_policy_layers = [32]
-        # Hidden layers for policy head # Define the hidden layers in the policy head of the prediction network
-        self.support_size = 15  # Value and reward are scaled (with almost sqrt) and encoded on a vector with a range of -support_size to support_size
-        self.downsample = "resnet"  # Downsample observations before representation network, False / "CNN" (lighter) / "resnet" (See paper appendix Network Architecture)
+        self.network = "fullyconnected"
+        self.log_std_clamp = (-20, 2)  # Clamp the standard deviation
+        self.encoding_size = 10
+        # Fully Connected Network
+        self.fc_reward_layers = [64, 64]  # Define the hidden layers in the reward network
+        self.fc_value_layers = [64, 64]  # Define the hidden layers in the value network
+        self.fc_mu_policy_layers = [64, 64]  # Define the hidden layers in the policy network
+        self.fc_log_std_policy_layers = [64, 64]  # Define the hidden layers in the policy network
+        self.fc_representation_layers = []  # Define the hidden layers in the representation network
+        self.fc_dynamics_layers = [64, 64]  # Define the hidden layers in the dynamics network
+        self.support_size = 10  # Value and reward are scaled (with almost sqrt) and encoded on a vector with a range of -support_size to support_size
 
         ### Training  训练相关参数
         # 训练日志和相关数据保存地址
@@ -95,8 +89,8 @@ class MuZeroConfig:
         初期稳定性不佳: 如果模型在训练的早期表现出不稳定的情况，可以稍微增大 value_loss_weight 来减轻这种波动。
         后期细调: 在训练的中后期，逐步调高 value_loss_weight，以确保价值预测的稳定性，并减少训练过程中的波动。
         """
-        self.value_loss_weight = 0.5  # 缩放value loss避免过拟合,论文参数是0.25,直接给到五倍好了
-        self.entropy_loss_weight = 0.04  # 缩放entropy_loss
+        self.value_loss_weight = 1  # 缩放value loss避免过拟合,论文参数是0.25,直接给到五倍好了
+        self.entropy_loss_weight = 0  # 缩放entropy_loss
         """
         # 初期阶段: 增大 entropy_loss_weight 以增强探索性，帮助模型更好地适应复杂环境。
         # 中后期阶段: 减小 entropy_loss_weight 以加快收敛，减少训练过程中的波动。
@@ -108,12 +102,12 @@ class MuZeroConfig:
         self.momentum = 0.9  # Used only if optimizer is SGD
 
         # Exponential learning rate schedule
-        self.lr_init = 0.0001  # Initial learning rate
-        self.lr_decay_rate = 0.95  # Set it to 1 to use a constant learning rate
+        self.lr_init = 0.004  # Initial learning rate
+        self.lr_decay_rate = 1  # Set it to 1 to use a constant learning rate
         self.lr_decay_steps = 1000
 
         ### Replay Buffer
-        self.replay_buffer_size = int(1e6)  # 缓存空间中记录的自我监督的数据数量,给高了的话,容易引入噪声,如果给低了,性能不佳不稳定
+        self.replay_buffer_size = 500  # 缓存空间中记录的自我监督的数据数量,给高了的话,容易引入噪声,如果给低了,性能不佳不稳定
         """
         举个例子：
         假设你在训练一个自动驾驶模型，在模拟中车辆经过一个弯道。设置 self.num_unroll_steps = 15 
@@ -124,7 +118,7 @@ class MuZeroConfig:
         这个参数的配置对模型捕捉时间相关性和优化长期决策非常关键。
         选择合适的 num_unroll_steps 可以帮助模型更好地理解和预测未来的状态和奖励，从而提升训练效果和决策质量。
         """
-        self.num_unroll_steps = 5  # 每个批次中保留多少数量的moves的数据
+        self.num_unroll_steps = 10  # 每个批次中保留多少数量的moves的数据
         """
         例子：
         假设在一个自动驾驶任务中，车辆需要计划如何通过一个复杂的交通路口。设置 td_steps 为 5 意味着模型将根据未来的 
@@ -133,7 +127,7 @@ class MuZeroConfig:
         td_steps 是一个控制时间差分更新步数的参数，用于决定在计算当前状态的目标价值时，要向未来看多少步。
         它影响了模型在短期与长期回报之间的权衡，配置合适的 td_steps 对于提升模型的表现至关重要。
         """
-        self.td_steps = 10  # Number of steps in the future to take into account for calculating the target value
+        self.td_steps = 50  # Number of steps in the future to take into account for calculating the target value
         """
         这两个参数 `self.PER` 和 `self.PER_alpha` 与**优先经验回放（Prioritized Experience Replay, PER）**相关，这是强化学习中用于提高样本效率和加快收敛的一种技术。
         ### 1. **`self.PER`**: 
@@ -164,7 +158,7 @@ class MuZeroConfig:
         - **`self.PER_alpha`**：控制优先经验回放中的优先化程度，值越高，样本的选择越依赖其优先级，有助于更高效地利用经验样本。
         """
         self.PER = True  # Prioritized Replay (See paper appendix Training), select in priority the elements in the replay buffer which are unexpected for the network
-        self.PER_alpha = 0.6  # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
+        self.PER_alpha = 0.5  # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
 
         # Reanalyze (See paper appendix Reanalyse)
         self.use_last_model_value = True  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
@@ -173,7 +167,7 @@ class MuZeroConfig:
         ### Adjust the self play / training ratio to avoid over/underfitting
         self.self_play_delay = 0  # Number of seconds to wait after each played game
         self.training_delay = 0  # Number of seconds to wait after each training step
-        self.ratio = None  # Desired training steps per self played step ratio. Equivalent to a synchronous version, training can take much longer. Set it to None to disable it
+        self.ratio = 1/100  # Desired training steps per self played step ratio. Equivalent to a synchronous version, training can take much longer. Set it to None to disable it
         # fmt: on
 
     def visit_softmax_temperature_fn(self, trained_steps):
@@ -203,23 +197,23 @@ class Game(AbstractGame):
                                 'observation': {"type": "Kinematics",  # 使用这个观测器作为状态空间，可以获取观测车辆位置、观测车辆速度和观测车辆转向角
                                                 "vehicles_count": 21,  # 20辆周围车辆
                                                 "features": ["presence", "x", "y", "vx", "vy"],
-                                                # "features_range": {
-                                                #     "x": [-100, 100],
-                                                #     "y": [-100, 100],
-                                                #     "vx": [-20, 20],
-                                                #     "vy": [-20, 20]
-                                                # },
+                                                "features_range": {
+                                                    # "x": [-100, 100],
+                                                    # "y": [-100, 100],
+                                                    "vx": [-30, 30],
+                                                    "vy": [-30, 30]
+                                                },
                                                 # 控制状态空间包括转向角
                                                 "absolute": True,  # 使用相对坐标，相对于观测车辆。为True时使用相对于环境的全局坐标系。
                                                 "order": "sorted",
                                                 "normalize": False,# 根据与自车的距离从近到远排列。这种排列方式使得观测数组的顺序保持稳定
                                                 },
-                                'action': {'type': 'DiscreteMetaAction'},
-                                # 'action': {'type': 'ContinuousAction',
-                                #            'acceleration_range': (-4, 4.0),
-                                #            'steering_range': (-np.pi / 12, np.pi / 12)},  # 为它扩展一个能够控制横向加速度和纵向加速度的子类
-                                'simulation_frequency': 15,  # 模拟频率
-                                'policy_frequency': 1,  # 策略频率
+                                # 'action': {'type': 'DiscreteMetaAction'},
+                                'action': {'type': 'ContinuousAction',
+                                           'acceleration_range': (-4, 4.0),
+                                           'steering_range': (-np.pi / 12, np.pi / 12)},  # 为它扩展一个能够控制横向加速度和纵向加速度的子类
+                                'simulation_frequency': 24,  # 模拟频率
+                                'policy_frequency': 12,  # 策略频率
                                 # 纵向决策：IDM（智能驾驶模型）根据前车的距离和速度计算出加速度。
                                 'other_vehicles_type': 'highway_env.vehicle.behavior.IDMVehicle',
                                 'screen_width': 600,  # 屏幕宽度
@@ -227,7 +221,7 @@ class Game(AbstractGame):
                                 'centering_position': [0.3, 0.5],  # 初始缩放比例
                                 'scaling': 5.5,  # 偏移量
                                 'show_trajectories': False,  # 是否记录车辆最近的轨迹并显示
-                                'render_agent': False,  # 控制渲染是否应用到屏幕
+                                'render_agent': True,  # 控制渲染是否应用到屏幕
                                 'offscreen_rendering': False,  # 当前的渲染是否是在屏幕外进行的。如果为False，意味着渲染是在屏幕上进行的，
                                 'manual_control': False,  # 是否允许键盘控制观测车辆
                                 'real_time_rendering': False,  # 是否实时渲染画面
@@ -260,7 +254,7 @@ class Game(AbstractGame):
             The new observation, the reward and a boolean if the game has ended.
         """
         # logger.info(f"start step: {datetime.datetime.now()}")
-        # action = numpy.tanh(action)
+        action = numpy.tanh(action)
         observation, reward, done, _, _ = self.env.step(action)
         # observation = observation.reshape((147,))
 
@@ -302,3 +296,6 @@ class Game(AbstractGame):
         #     fps=5,
         # )
         self.gif_imgs = []
+
+    def close(self):
+        self.env.close()
