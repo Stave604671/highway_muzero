@@ -195,7 +195,7 @@ class SelfPlay:
                 # Choose the action如果 opponent 是 "self" 或者当前轮到的玩家是 muzero_player，则通过蒙特卡洛树搜索（MCTS）选择行动
                 if opponent == "self" or muzero_player == self.game.to_play():
                     # 初始化蒙特卡洛树，并返回根节点和蒙特卡洛树的其他信息
-                    logger.info(f"初始化树{datetime.datetime.now()}")
+                    # logger.info(f"初始化树{datetime.datetime.now()}")
                     root, mcts_info = mcts.run(
                         self.model,
                         stacked_observations,

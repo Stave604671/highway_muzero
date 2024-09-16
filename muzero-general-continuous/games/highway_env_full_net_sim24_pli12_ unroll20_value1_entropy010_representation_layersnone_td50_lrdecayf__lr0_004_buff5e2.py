@@ -25,7 +25,7 @@ class MuZeroConfig:
         self.opponent = None  # MuZero 面对的对手，用于评估在多人游戏中的进展。可以是 "random" 或 "expert"，如果在游戏类中实现了对手
 
         # Self-Play
-        self.num_workers = 1  # 定义了同时进行 Self-Play 的工作线程数量，这些线程负责生成训练样本并将其存储到回放缓冲区中。
+        self.num_workers = 6  # 定义了同时进行 Self-Play 的工作线程数量，这些线程负责生成训练样本并将其存储到回放缓冲区中。
         self.selfplay_on_gpu = True  # 是否在gpu进行自我博弈,打开后速度变快,但是显存开支会高很多
         self.max_moves = 1000  # 每场游戏的最大游戏次数,未发生碰撞,或者没有达到这个次数,单场游戏都不停止
         self.num_simulations = 50  # 执行指定次数的模拟，每次模拟从根节点开始进行搜索和更新,
@@ -81,7 +81,7 @@ class MuZeroConfig:
         # 整体训练轮次
         self.training_steps = 20000  # Total number of training steps (ie weights update according to a batch)
         # batch size大小
-        self.batch_size = 128  # Number of parts of games to train on at each training step
+        self.batch_size = 512  # Number of parts of games to train on at each training step
         # 多少轮保存一次数据
         self.checkpoint_interval = 10  # Number of training steps before using the model for self-playing
         """
@@ -90,7 +90,7 @@ class MuZeroConfig:
         后期细调: 在训练的中后期，逐步调高 value_loss_weight，以确保价值预测的稳定性，并减少训练过程中的波动。
         """
         self.value_loss_weight = 1  # 缩放value loss避免过拟合,论文参数是0.25,直接给到五倍好了
-        self.entropy_loss_weight = 0  # 缩放entropy_loss
+        self.entropy_loss_weight = 0.10  # 缩放entropy_loss
         """
         # 初期阶段: 增大 entropy_loss_weight 以增强探索性，帮助模型更好地适应复杂环境。
         # 中后期阶段: 减小 entropy_loss_weight 以加快收敛，减少训练过程中的波动。
@@ -118,7 +118,7 @@ class MuZeroConfig:
         这个参数的配置对模型捕捉时间相关性和优化长期决策非常关键。
         选择合适的 num_unroll_steps 可以帮助模型更好地理解和预测未来的状态和奖励，从而提升训练效果和决策质量。
         """
-        self.num_unroll_steps = 10  # 每个批次中保留多少数量的moves的数据
+        self.num_unroll_steps = 20  # 每个批次中保留多少数量的moves的数据
         """
         例子：
         假设在一个自动驾驶任务中，车辆需要计划如何通过一个复杂的交通路口。设置 td_steps 为 5 意味着模型将根据未来的 
