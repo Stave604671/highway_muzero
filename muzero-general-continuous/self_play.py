@@ -180,14 +180,11 @@ class SelfPlay:
             while (  # 开始一个循环，直到游戏结束 (done=True) 或者达到最大移动次数
                 not done and len(game_history.action_history) <= self.config.max_moves
             ):
+                observation_shape = numpy.array(observation).shape
                 # 观测空间的返回值需要是三维的
-                assert (
-                    len(numpy.array(observation).shape) == 3
-                ), f"Observation should be 3 dimensionnal instead of {len(numpy.array(observation).shape)} dimensionnal. Got observation of shape: {numpy.array(observation).shape}"
+                assert (len(observation_shape) == 3), f"Observation should be 3 dimensionnal instead of {len(numpy.array(observation).shape)} dimensionnal. Got observation of shape: {numpy.array(observation).shape}"
                 # 观测空间的大小需要与配置文件一致
-                assert (
-                    numpy.array(observation).shape == self.config.observation_shape
-                ), f"Observation should match the observation_shape defined in MuZeroConfig. Expected {self.config.observation_shape} but got {numpy.array(observation).shape}."
+                assert (observation_shape == self.config.observation_shape), f"Observation should match the observation_shape defined in MuZeroConfig. Expected {self.config.observation_shape} but got {numpy.array(observation).shape}."
                 # 用于获取堆叠的观测数据。通常用于提供过去几帧的观测数据，以帮助模型做出更好的决策。【实验验证连续型场景这个参数对训练没帮助】
                 stacked_observations = game_history.get_stacked_observations(
                     -1, self.config.stacked_observations
@@ -211,9 +208,8 @@ class SelfPlay:
                            or len(game_history.action_history) < temperature_threshold
                         else 0,
                     )
-                    obs_car_line_value = observation[0][0][2]
-                    # 获取观测车辆的 y 坐标（第一行的第三列）
                     ego_vehicle_y = observation[0, 0, 2]
+                    # 获取观测车辆的 y 坐标（第一行的第三列）
                     ego_lane = get_lane(ego_vehicle_y)
                     # 过滤出存在于观测空间的车辆（第一列为 1）
                     present_cars = observation[0, observation[0, :, 0] == 1]
@@ -221,19 +217,22 @@ class SelfPlay:
                     same_lane_exists = any(get_lane(car[2]) == ego_lane for car in present_cars)
                     # logger.info(f"观测车辆车道坐标---{obs_car_line_value} 观测车辆的车道角度2：{type(action.value[1])}  {action.value[1]}")
 
-                    if obs_car_line_value < 4 and action.value[1] < 0:  # 在第一车道并且尝试左拐，改成右拐
+                    if ego_lane == 1 and action.value[1] < 0:  # 第一车道禁止左拐
                         action.value[1] = -action.value[1]
-                    if obs_car_line_value > 12 and action.value[1] > 0:  # 在第四车道并且尝试右拐，改成左拐
+                    elif ego_lane == 4 and action.value[1] > 0:  # 第四车道禁止右拐
                         action.value[1] = -action.value[1]
                     # if obs_car_line_value > 10 and action.value[1] > 1:
                     #     action.value[1] = -action.value[1]
                     if not same_lane_exists:  # 没车辆和它在相同车道，不拐
                         action.value[1] = 0
+                    # 平滑转向控制，减少突发变化
                     if previous_action_value is not None:
                         action.value[1] = 0.9 * action.value[1] + 0.1 * previous_action_value[1]
-                        previous_action_value = action.value
+                        action.value[0] = 0.9 * action.value[0] + 0.1 * previous_action_value[0]
+                    previous_action_value = action.value
+                    # 确保加速度不为负
                     if action.value[0] < 0:
-                        action.value[0] = 0  # 确保加速度不会为负
+                        action.value[0] = 0
                     # logger.info(f"{observation}----{action.value}")
                     # logger.info(f"单步规划时间2：{datetime.datetime.now()}")
                     # logger.info(f"观测车辆车道坐标??{observation[0][0]}??{obs_car_line_value} 观测车辆的车道角度2：{type(action.value[1])}  {action.value[1]}")
