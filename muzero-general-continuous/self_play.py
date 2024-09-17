@@ -140,15 +140,11 @@ class SelfPlay:
         self.close_game()
 
     def play_game(
-        self, temperature, temperature_threshold, render, opponent, muzero_player
+            self, temperature, temperature_threshold, render, opponent, muzero_player
     ):
-        """ 使用蒙特卡洛树搜索（MCTS）来模拟一场游戏对局
-        Play one game with actions based on the Monte Carlo tree search at each moves.
-        :param temperature: 训练温度
-        :param temperature_threshold: 温度阈值，当训练步数超过temperature_threshold时，训练温度直接归0
-        :param render: 是否渲染游戏画面。如果为 True，会在每一步显示游戏状态，用于调试或观察对局情况。训练过程默认是false
-        :param opponent: 对手的类型，默认是self，也就是自我对弈
-        :param muzero_player: 当前的 MuZero 玩家，用于区分多玩家环境中谁是 MuZero 控制的玩家。自我对弈默认是0.
+        """
+        使用蒙特卡洛树搜索（MCTS）来模拟一场游戏对局
+        Play one game with actions based on the Monte Carlo tree search at each move.
         """
         # 初始化游戏历史记录和初始观测
         game_history = GameHistory()
@@ -157,118 +153,118 @@ class SelfPlay:
         game_history.observation_history.append(observation)
         game_history.reward_history.append(0)
         game_history.to_play_history.append(self.game.to_play())
-        done = False  # 检查游戏是否结束
+        done = False
         mcts = MCTS(self.config)
         previous_action_value = None
-        # logger.info("value1")
-        if render:  # 是否开启画面渲染
-            # logger.info("value2")
+
+        if render:
             self.game.render()
-            # logger.info("value3")
-        # 禁用 PyTorch 的梯度计算，确保代码在推理时不计算梯度，以提高速度和减少内存消耗。
+
+        # 获取车道的方法，简化了区间逻辑
         def get_lane(y_coord):
-            if 0 <= y_coord < 4:
-                return 1
-            elif 4 <= y_coord < 8:
-                return 2
-            elif 8 <= y_coord < 12:
-                return 3
-            elif 12 <= y_coord < 16:
-                return 4
-            return -1  # 超出车道范围
+            lane_size = 4  # 每个车道的宽度
+            return int(y_coord // lane_size) + 1  # 返回车道编号
+
         with torch.no_grad():
-            while (  # 开始一个循环，直到游戏结束 (done=True) 或者达到最大移动次数
-                not done and len(game_history.action_history) <= self.config.max_moves
-            ):
+            while not done and len(game_history.action_history) <= self.config.max_moves:
                 observation_shape = numpy.array(observation).shape
-                # 观测空间的返回值需要是三维的
-                assert (len(observation_shape) == 3), f"Observation should be 3 dimensionnal instead of {len(numpy.array(observation).shape)} dimensionnal. Got observation of shape: {numpy.array(observation).shape}"
-                # 观测空间的大小需要与配置文件一致
-                assert (observation_shape == self.config.observation_shape), f"Observation should match the observation_shape defined in MuZeroConfig. Expected {self.config.observation_shape} but got {numpy.array(observation).shape}."
-                # 用于获取堆叠的观测数据。通常用于提供过去几帧的观测数据，以帮助模型做出更好的决策。【实验验证连续型场景这个参数对训练没帮助】
+                assert len(observation_shape) == 3, f"Expected 3D observation, got {observation_shape}"
+                assert observation_shape == self.config.observation_shape, f"Expected {self.config.observation_shape}, got {observation_shape}"
+
+                # 获取堆叠观测数据
                 stacked_observations = game_history.get_stacked_observations(
                     -1, self.config.stacked_observations
                 )
-                # Choose the action如果 opponent 是 "self" 或者当前轮到的玩家是 muzero_player，则通过蒙特卡洛树搜索（MCTS）选择行动
+
+                # 如果是自我对弈或玩家是 MuZero 玩家
                 if opponent == "self" or muzero_player == self.game.to_play():
-                    # 初始化蒙特卡洛树，并返回根节点和蒙特卡洛树的其他信息
-                    # logger.info(f"初始化树{datetime.datetime.now()}")
                     root, mcts_info = mcts.run(
-                        self.model,
-                        stacked_observations,
-                        self.game.to_play(),
-                        render,
+                        self.model, stacked_observations, self.game.to_play(), render
                     )
-                    # 根据 MCTS 的结果遍历树选择一个action
-                    # logger.info(f"单步规划时间1：{datetime.datetime.now()}")
                     action = self.select_action(
                         root,
-                        temperature
-                        if not temperature_threshold
-                           or len(game_history.action_history) < temperature_threshold
-                        else 0,
+                        temperature if not temperature_threshold or len(
+                            game_history.action_history) < temperature_threshold else 0,
                     )
+
+                    # 速度和转向控制
                     ego_vehicle_y = observation[0, 0, 2]
                     current_speed = self.game.env.vehicle.speed
-                    min_speed = 5.0  # 最低速度限制，防止车辆停下来
-                    max_speed = 30.0  # 最高速度限制，防止车辆超速
-                    # # 获取观测车辆的 y 坐标（第一行的第三列）
-                    # # 如果当前速度低于最低速度，并且加速度为负，强制增加加速度
+                    min_speed, max_speed = 5.0, 30.0  # 最小和最大速度限制
+                    # 控制加速度防止过慢或过快
                     if current_speed < min_speed and action.value[0] < 0:
-                        action.value[0] = 0  # 阻止进一步减速
-                    # 如果当前速度高于最高速度，并且加速度为正，强制减少加速度
+                        action.value[0] = 0  # 禁止减速
                     elif current_speed > max_speed and action.value[0] > 0:
-                        action.value[0] = 0  # 阻止进一步加速
+                        action.value[0] = 0  # 禁止继续加速
 
+                    # 获取车辆所在的车道
                     ego_lane = get_lane(ego_vehicle_y)
-                    # 过滤出存在于观测空间的车辆（第一列为 1）
-                    present_cars = observation[0, observation[0, :, 0] == 1]
-                    # 检查是否存在与观测车辆在同一车道的车辆
-                    logger.info(f"观测空间中的车辆数量1: {present_cars.shape}?观测车辆车道?{ego_lane}?观测车辆角度?{action.value[1]}加速度{action.value[0]}?速度?{current_speed}")
+                    present_cars = observation[0, observation[0, :, 0] == 1]  # 存在的车辆
 
                     same_lane_exists = any(get_lane(car[2]) == ego_lane for car in present_cars)
-                    if ego_lane in [-1, 1, 4]:  # 如果在边缘车道
-                        # 限制加速度
-                        max_speed = 20
-                        if current_speed > max_speed and action.value[0] > 0:
-                            action.value[0] = 0
+                    logger.info(
+                        f"观测空间中的车辆数量1: {present_cars.shape}?观测车辆车道?{ego_lane}?观测车辆角度?{action.value[1]}加速度{action.value[0]}?速度?{current_speed}")
 
-                        # 限制转向角度
-                        if (ego_lane == 1 and action.value[1] < 0) or (ego_lane == 4 and action.value[1] > 0):
-                            action.value[1] = 0
-                    logger.info(f"观测空间中的车辆数量2: {present_cars.shape}?观测车辆车道?{ego_lane}?观测车辆角度?{action.value[1]}加速度{action.value[0]}?速度?{current_speed}")
-
-                    if not same_lane_exists:  # 没车辆和它在相同车道，不拐
-                        action.value[1] = 0
-                    # 平滑转向控制，减少突发变化
                     if previous_action_value is not None:
                         action.value[1] = 0.7 * action.value[1] + 0.3 * previous_action_value[1]
-                    logger.info(f"观测空间中的车辆数量3: {present_cars.shape}?观测车辆车道?{ego_lane}?观测车辆角度?{action.value[1]}加速度{action.value[0]}?速度?{current_speed}")
 
                     previous_action_value = action.value
-                    # 确保加速度不为负
+
+                    # 边缘车道处理（0, 1, 4）
+                    if ego_lane in [0, 1, 4]:
+                        # 速度限制
+                        if current_speed > 20 and action.value[0] > 0:
+                            action.value[0] = 0  # 禁止进一步加速
+
+                        # 转向处理：如果在左侧车道（1），限制左转；在右侧车道（4），限制右转
+                        if ego_lane == 1 and action.value[1] < 0:  # 左边缘车道
+                            action.value[1] = 0.2  # 强制右转
+                        elif ego_lane == 4 and action.value[1] > 0:  # 右边缘车道
+                            action.value[1] = -0.2  # 强制左转
+
+                        # 高速进入边缘车道时的加速度调整
+                        if current_speed > 20:  # 高速阈值
+                            if ego_lane == 1 and action.value[0] < 0:  # 高速左边缘车道
+                                action.value[0] = 0.5  # 增加加速度
+                            elif ego_lane == 4 and action.value[0] < 0:  # 高速右边缘车道
+                                action.value[0] = 0.5  # 增加加速度
+
+                    logger.info(
+                        f"观测空间中的车辆数量2: {present_cars.shape}?观测车辆车道?{ego_lane}?观测车辆角度?{action.value[1]}加速度{action.value[0]}?速度?{current_speed}")
+
+                    # 如果当前车道没有其他车辆，避免转向
+                    if not same_lane_exists:
+                        action.value[1] = 0  # 不需要转向
+
+                    # 加速度下限限制，避免减速过多
                     if action.value[0] < -2:
                         action.value[0] = -2
-                    if render:  # 渲染模式打印日志结果
+
+                    logger.info(
+                        f"观测空间中的车辆数量3: {present_cars.shape}?观测车辆车道?{ego_lane}?观测车辆角度?{action.value[1]}加速度{action.value[0]}?速度?{current_speed}")
+
+                    if render:
                         logger.info(f'Tree depth: {mcts_info["max_tree_depth"]}')
                         logger.info(f"Root value for player {self.game.to_play()}: {root.value():.2f}")
                 else:
-                    # 如果当前玩家不是 muzero_player，则调用选择对手的动作
-                    action, root = self.select_opponent_action(
-                        opponent, stacked_observations
-                    )
-                # 执行蒙特卡洛树选择的动作，返回新的观测 observation、当前获得的奖励 reward，以及游戏是否结束的标志 done。
+                    action, root = self.select_opponent_action(opponent, stacked_observations)
+
+                # 执行动作并获取新状态
                 observation, reward, done = self.game.step(action.value)
-                if render:  # 渲染模式下实时打印当前状态
+
+                if render:
                     logger.info(f"Played action: {self.game.action_to_string(action)}")
                     self.game.render()
-                # 存储当前 MCTS 搜索的统计信息，比如各个动作的访问次数等。
+
+                # 存储 MCTS 搜索的统计信息
                 game_history.store_search_statistics(root)
-                # Next batch 将当前的动作、观测、奖励和下一轮的玩家信息分别添加到游戏历史记录中。
+
+                # 记录游戏历史
                 game_history.action_history.append(action.value)
                 game_history.observation_history.append(observation)
                 game_history.reward_history.append(reward)
                 game_history.to_play_history.append(self.game.to_play())
+
         self.game.render_rgb()
         self.game.save_gif()
         return game_history

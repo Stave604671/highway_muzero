@@ -15,7 +15,7 @@ class MuZeroConfig:
         self.max_num_gpus = None  # 固定使用gpu的最大数量.使用单个gpu会更快,没有配置的话会默认使用所有gpu
 
         # Game
-        self.observation_shape = (1, 21, 5)  # 游戏观测空间的维度,如果观测空间三维无所谓,如果是一维,需要配成(1,1,x)
+        self.observation_shape = (1, 21, 3)  # 游戏观测空间的维度,如果观测空间三维无所谓,如果是一维,需要配成(1,1,x)
         self.action_space = 2  # 动作空间的大小
         self.players = [i for i in range(1)]  # 玩家的数量,车辆换道场景观测和控制车辆只有一个,为1就行
         self.stacked_observations = 0  # 观测时叠加的历史观察数量（包括过去的动作）。
@@ -25,8 +25,8 @@ class MuZeroConfig:
         self.opponent = None  # MuZero 面对的对手，用于评估在多人游戏中的进展。可以是 "random" 或 "expert"，如果在游戏类中实现了对手
 
         # Self-Play
-        self.num_workers = 1  # 定义了同时进行 Self-Play 的工作线程数量，这些线程负责生成训练样本并将其存储到回放缓冲区中。
-        self.selfplay_on_gpu = True  # 是否在gpu进行自我博弈,打开后速度变快,但是显存开支会高很多
+        self.num_workers = 6  # 定义了同时进行 Self-Play 的工作线程数量，这些线程负责生成训练样本并将其存储到回放缓冲区中。
+        self.selfplay_on_gpu = False  # 是否在gpu进行自我博弈,打开后速度变快,但是显存开支会高很多
         self.max_moves = 1000  # 每场游戏的最大游戏次数,未发生碰撞,或者没有达到这个次数,单场游戏都不停止
         self.num_simulations = 50  # 执行指定次数的模拟，每次模拟从根节点开始进行搜索和更新,
         """
@@ -81,7 +81,7 @@ class MuZeroConfig:
         # 整体训练轮次
         self.training_steps = 20000  # Total number of training steps (ie weights update according to a batch)
         # batch size大小
-        self.batch_size = 128  # Number of parts of games to train on at each training step
+        self.batch_size = 512  # Number of parts of games to train on at each training step
         # 多少轮保存一次数据
         self.checkpoint_interval = 10  # Number of training steps before using the model for self-playing
         """
@@ -90,7 +90,7 @@ class MuZeroConfig:
         后期细调: 在训练的中后期，逐步调高 value_loss_weight，以确保价值预测的稳定性，并减少训练过程中的波动。
         """
         self.value_loss_weight = 1  # 缩放value loss避免过拟合,论文参数是0.25,直接给到五倍好了
-        self.entropy_loss_weight = 0  # 缩放entropy_loss
+        self.entropy_loss_weight = 0.10  # 缩放entropy_loss
         """
         # 初期阶段: 增大 entropy_loss_weight 以增强探索性，帮助模型更好地适应复杂环境。
         # 中后期阶段: 减小 entropy_loss_weight 以加快收敛，减少训练过程中的波动。
@@ -118,7 +118,7 @@ class MuZeroConfig:
         这个参数的配置对模型捕捉时间相关性和优化长期决策非常关键。
         选择合适的 num_unroll_steps 可以帮助模型更好地理解和预测未来的状态和奖励，从而提升训练效果和决策质量。
         """
-        self.num_unroll_steps = 10  # 每个批次中保留多少数量的moves的数据
+        self.num_unroll_steps = 20  # 每个批次中保留多少数量的moves的数据
         """
         例子：
         假设在一个自动驾驶任务中，车辆需要计划如何通过一个复杂的交通路口。设置 td_steps 为 5 意味着模型将根据未来的 
@@ -196,13 +196,13 @@ class Game(AbstractGame):
                             config={  # 需要在程序启动这个观测器之前使用自定义的公式来对观测车辆的初始速度和初始位置进行初始化
                                 'observation': {"type": "Kinematics",  # 使用这个观测器作为状态空间，可以获取观测车辆位置、观测车辆速度和观测车辆转向角
                                                 "vehicles_count": 21,  # 20辆周围车辆
-                                                "features": ["presence", "x", "y", "vx", "vy"],
-                                                "features_range": {
-                                                    # "x": [-100, 100],
-                                                    # "y": [-100, 100],
-                                                    "vx": [-30, 30],
-                                                    "vy": [-30, 30]
-                                                },
+                                                "features": ["presence", "x", "y"],
+                                                # "features_range": {
+                                                #     # "x": [-100, 100],
+                                                #     # "y": [-100, 100],
+                                                #     "vx": [-30, 30],
+                                                #     "vy": [-30, 30]
+                                                # },
                                                 # 控制状态空间包括转向角
                                                 "absolute": True,  # 使用相对坐标，相对于观测车辆。为True时使用相对于环境的全局坐标系。
                                                 "order": "sorted",
@@ -216,8 +216,8 @@ class Game(AbstractGame):
                                 'policy_frequency': 12,  # 策略频率
                                 # 纵向决策：IDM（智能驾驶模型）根据前车的距离和速度计算出加速度。
                                 'other_vehicles_type': 'highway_env.vehicle.behavior.IDMVehicle',
-                                'screen_width': 600,  # 屏幕宽度
-                                'screen_height': 150,  # 屏幕高度
+                                'screen_width': 1200,  # 屏幕宽度
+                                'screen_height': 900,  # 屏幕高度
                                 'centering_position': [0.3, 0.5],  # 初始缩放比例
                                 'scaling': 5.5,  # 偏移量
                                 'show_trajectories': False,  # 是否记录车辆最近的轨迹并显示
@@ -241,6 +241,9 @@ class Game(AbstractGame):
                             })
         self.seed = seed
         self.env.reset()
+        self.previous_positions = None  # 存储上一个时间步的车辆位置
+        self.dt = 1 / 12  # 时间步长 (1 / policy_frequency)
+        # self.velocities = 25
         self.gif_imgs = []
 
     def step(self, action):
@@ -254,10 +257,9 @@ class Game(AbstractGame):
             The new observation, the reward and a boolean if the game has ended.
         """
         # logger.info(f"start step: {datetime.datetime.now()}")
-        action = numpy.tanh(action)
+        # action = numpy.tanh(action)
         observation, reward, done, _, _ = self.env.step(action)
         # observation = observation.reshape((147,))
-
         # logger.info(f"end step: {datetime.datetime.now()}")
         return numpy.array([observation]), reward, done
 
@@ -272,7 +274,7 @@ class Game(AbstractGame):
 
         # Reshape the observation to 3D (1, 1, -1)
         observation = np.array(observation)
-        observation = observation.reshape((1, 21, 5))
+        observation = observation.reshape((1, 21, 3))
         # logger.info(f"Observation2 reset shape after step:{type(observation)}-shape-{observation.shape}")
         return observation
 
