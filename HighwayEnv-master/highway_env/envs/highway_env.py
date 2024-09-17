@@ -180,6 +180,9 @@ class HighwayEnv(AbstractEnv):
                 ],
                 [0, 1],
             )
+        # 添加时间步惩罚，防止车辆拖延时间
+        time_step_penalty = -0.01  # 每个时间步增加轻微惩罚
+        reward += time_step_penalty
         return reward
 
     def _rewards(self, action: Action) -> Dict[Text, float]:
@@ -200,6 +203,14 @@ class HighwayEnv(AbstractEnv):
         forward_speed = self.vehicle.speed * np.cos(self.vehicle.heading)
         high_speed_reward = -1 + (forward_speed - v_min) / (v_max - v_min)
         high_speed_reward = np.clip(high_speed_reward, -1, 1)  # 保证结果在 [-1, 1] 范围内
+
+        # 引入低速惩罚
+        low_speed_penalty = 0
+        min_speed_threshold = self.config.get("min_speed_threshold", 5)  # 最低速度阈值
+        if forward_speed < min_speed_threshold:
+            low_speed_penalty = -1.0  # 低速时的惩罚
+
+
         # 判断是否进行了换道操作
         # 判断是否进行了换道操作并且保持在道路上
         lane_change_reward = 0
@@ -215,6 +226,8 @@ class HighwayEnv(AbstractEnv):
             "high_speed_reward": high_speed_reward,
             "lane_change_reward": lane_change_reward,
             "on_road_reward": float(self.vehicle.on_road) + 1,
+            "low_speed_penalty": low_speed_penalty,
+            # "acceleration_reward": acceleration_reward,
         }
 
     def _is_terminated(self) -> bool:

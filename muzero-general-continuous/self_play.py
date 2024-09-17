@@ -209,33 +209,46 @@ class SelfPlay:
                         else 0,
                     )
                     ego_vehicle_y = observation[0, 0, 2]
-                    # 获取观测车辆的 y 坐标（第一行的第三列）
+                    current_speed = self.game.env.vehicle.speed
+                    min_speed = 5.0  # 最低速度限制，防止车辆停下来
+                    max_speed = 30.0  # 最高速度限制，防止车辆超速
+                    # # 获取观测车辆的 y 坐标（第一行的第三列）
+                    # # 如果当前速度低于最低速度，并且加速度为负，强制增加加速度
+                    if current_speed < min_speed and action.value[0] < 0:
+                        action.value[0] = 0  # 阻止进一步减速
+                    # 如果当前速度高于最高速度，并且加速度为正，强制减少加速度
+                    elif current_speed > max_speed and action.value[0] > 0:
+                        action.value[0] = 0  # 阻止进一步加速
+
                     ego_lane = get_lane(ego_vehicle_y)
                     # 过滤出存在于观测空间的车辆（第一列为 1）
                     present_cars = observation[0, observation[0, :, 0] == 1]
                     # 检查是否存在与观测车辆在同一车道的车辆
-                    same_lane_exists = any(get_lane(car[2]) == ego_lane for car in present_cars)
-                    # logger.info(f"观测车辆车道坐标---{obs_car_line_value} 观测车辆的车道角度2：{type(action.value[1])}  {action.value[1]}")
+                    logger.info(f"观测空间中的车辆数量1: {present_cars.shape}?观测车辆车道?{ego_lane}?观测车辆角度?{action.value[1]}加速度{action.value[0]}?速度?{current_speed}")
 
-                    if ego_lane == 1 and action.value[1] < 0:  # 第一车道禁止左拐
-                        action.value[1] = -action.value[1]
-                    elif ego_lane == 4 and action.value[1] > 0:  # 第四车道禁止右拐
-                        action.value[1] = -action.value[1]
-                    # if obs_car_line_value > 10 and action.value[1] > 1:
-                    #     action.value[1] = -action.value[1]
+                    same_lane_exists = any(get_lane(car[2]) == ego_lane for car in present_cars)
+                    if ego_lane in [-1, 1, 4]:  # 如果在边缘车道
+                        # 限制加速度
+                        max_speed = 20
+                        if current_speed > max_speed and action.value[0] > 0:
+                            action.value[0] = 0
+
+                        # 限制转向角度
+                        if (ego_lane == 1 and action.value[1] < 0) or (ego_lane == 4 and action.value[1] > 0):
+                            action.value[1] = 0
+                    logger.info(f"观测空间中的车辆数量2: {present_cars.shape}?观测车辆车道?{ego_lane}?观测车辆角度?{action.value[1]}加速度{action.value[0]}?速度?{current_speed}")
+
                     if not same_lane_exists:  # 没车辆和它在相同车道，不拐
                         action.value[1] = 0
                     # 平滑转向控制，减少突发变化
                     if previous_action_value is not None:
-                        action.value[1] = 0.9 * action.value[1] + 0.1 * previous_action_value[1]
-                        action.value[0] = 0.9 * action.value[0] + 0.1 * previous_action_value[0]
+                        action.value[1] = 0.7 * action.value[1] + 0.3 * previous_action_value[1]
+                    logger.info(f"观测空间中的车辆数量3: {present_cars.shape}?观测车辆车道?{ego_lane}?观测车辆角度?{action.value[1]}加速度{action.value[0]}?速度?{current_speed}")
+
                     previous_action_value = action.value
                     # 确保加速度不为负
-                    if action.value[0] < 0:
-                        action.value[0] = 0
-                    # logger.info(f"{observation}----{action.value}")
-                    # logger.info(f"单步规划时间2：{datetime.datetime.now()}")
-                    # logger.info(f"观测车辆车道坐标??{observation[0][0]}??{obs_car_line_value} 观测车辆的车道角度2：{type(action.value[1])}  {action.value[1]}")
+                    if action.value[0] < -2:
+                        action.value[0] = -2
                     if render:  # 渲染模式打印日志结果
                         logger.info(f'Tree depth: {mcts_info["max_tree_depth"]}')
                         logger.info(f"Root value for player {self.game.to_play()}: {root.value():.2f}")
