@@ -14,6 +14,22 @@ from highway_env.vehicle.kinematics import Vehicle
 Observation = np.ndarray
 
 
+class PIDController:
+    def __init__(self, Kp: float, Ki: float, Kd: float) -> None:
+        self.Kp = Kp
+        self.Ki = Ki
+        self.Kd = Kd
+        self.last_error = 0
+        self.integral = 0
+
+    def update(self, target_heading: float, current_heading: float, dt: float) -> float:
+        error = target_heading - current_heading
+        self.integral += error * dt
+        derivative = (error - self.last_error) / dt
+        self.last_error = error
+        return self.Kp * error + self.Ki * self.integral + self.Kd * derivative
+
+
 class HighwayEnv(AbstractEnv):
     """
     A highway driving environment.
@@ -100,6 +116,8 @@ class HighwayEnv(AbstractEnv):
         :return: the corresponding reward
         """
         rewards = self._rewards(action)
+        if self._exceeds_steering_angle_threshold():
+            rewards["lane_change_reward"] = -1  # 负奖励
         reward = sum(
             self.config.get(name, 0) * reward for name, reward in rewards.items()
         )
@@ -114,6 +132,12 @@ class HighwayEnv(AbstractEnv):
             )
         reward *= rewards["on_road_reward"]
         return reward
+
+    def _exceeds_steering_angle_threshold(self) -> bool:
+        current_heading = self.vehicle.heading
+        target_heading = self.vehicle.target_heading  # 假设有一个目标方向
+        angle_difference = np.abs(current_heading - target_heading)
+        return angle_difference > np.pi / 18  # 例如，超过10度时返回True
 
     def _rewards(self, action: Action) -> dict[str, float]:
         neighbours = self.road.network.all_side_lanes(self.vehicle.lane_index)
@@ -145,6 +169,12 @@ class HighwayEnv(AbstractEnv):
     def _is_truncated(self) -> bool:
         """The episode is truncated if the time limit is reached."""
         return self.time >= self.config["duration"]
+
+    def control_vehicle(self, target_heading: float) -> None:
+        dt = 0.1  # 时间间隔
+        pid_controller = PIDController(Kp=1.0, Ki=0.1, Kd=0.05)
+        steering_output = pid_controller.update(target_heading, self.vehicle.heading, dt)
+        self.vehicle.steering = np.clip(steering_output, -1.0, 1.0)  # 假设转向范围在 -1 到 1 之间
 
 
 class HighwayEnvFast(HighwayEnv):
