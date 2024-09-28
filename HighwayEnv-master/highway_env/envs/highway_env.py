@@ -116,8 +116,6 @@ class HighwayEnv(AbstractEnv):
         :return: the corresponding reward
         """
         rewards = self._rewards(action)
-        if self._exceeds_steering_angle_threshold():
-            rewards["lane_change_reward"] = -1  # 负奖励
         reward = sum(
             self.config.get(name, 0) * reward for name, reward in rewards.items()
         )
@@ -125,19 +123,13 @@ class HighwayEnv(AbstractEnv):
             reward = utils.lmap(
                 reward,
                 [
-                    self.config["collision_reward"],
+                    self.config["collision_reward"] + self.config["lane_change_reward"],
                     self.config["high_speed_reward"] + self.config["right_lane_reward"],
                 ],
                 [0, 1],
             )
         reward *= rewards["on_road_reward"]
         return reward
-
-    def _exceeds_steering_angle_threshold(self) -> bool:
-        current_heading = self.vehicle.heading
-        target_heading = self.vehicle.target_heading  # 假设有一个目标方向
-        angle_difference = np.abs(current_heading - target_heading)
-        return angle_difference > np.pi / 18  # 例如，超过10度时返回True
 
     def _rewards(self, action: Action) -> dict[str, float]:
         neighbours = self.road.network.all_side_lanes(self.vehicle.lane_index)
@@ -151,9 +143,16 @@ class HighwayEnv(AbstractEnv):
         scaled_speed = utils.lmap(
             forward_speed, self.config["reward_speed_range"], [0, 1]
         )
+        lane_change_reward = 0
+        if hasattr(self.vehicle, 'last_lane_index'):
+            if self.vehicle.lane_index[2] != self.vehicle.last_lane_index:
+                lane_change_reward = self.config["lane_change_reward"]
+        # 更新 last_lane_index
+        self.vehicle.last_lane_index = self.vehicle.lane_index[2]
         return {
             "collision_reward": float(self.vehicle.crashed),
             "right_lane_reward": lane / max(len(neighbours) - 1, 1),
+            "lane_change_reward": lane_change_reward,
             "high_speed_reward": np.clip(scaled_speed, 0, 1),
             "on_road_reward": float(self.vehicle.on_road),
         }
