@@ -25,7 +25,6 @@ class Trainer:
         # Initialize the network
         self.model = models.MuZeroNetwork(self.config)
         self.model.set_weights(copy.deepcopy(initial_checkpoint["weights"]))
-        # self.model.to(torch.device("cpu"))
         self.model.to(torch.device("cuda" if self.config.train_on_gpu else "cpu"))
         self.model.train()
 
@@ -48,12 +47,6 @@ class Trainer:
                 lr=self.config.lr_init,
                 weight_decay=self.config.weight_decay,
             )
-        elif self.config.optimizer == "AdamW":
-            self.optimizer = torch.optim.AdamW(
-                self.model.parameters(),
-                lr=self.config.lr_init,
-                weight_decay=self.config.weight_decay
-            )
         else:
             raise NotImplementedError(
                 f"{self.config.optimizer} is not implemented. You can change the optimizer manually in trainer.py."
@@ -66,16 +59,10 @@ class Trainer:
             )
 
     def continuous_update_weights(self, replay_buffer, shared_storage):
-        """
-        负责从回放缓冲区获取批次数据，执行训练步骤，更新模型权重，并管理训练过程中的各种细节。
-        :param replay_buffer: 回放缓冲区，用于获取训练批次。
-        :param shared_storage: 共享存储，用于保存和加载模型检查点及训练信息。
-        """
         # Wait for the replay buffer to be filled
-        # 等待回放缓冲区中至少有一个游戏的数据（即至少有一个训练批次）。
         while ray.get(shared_storage.get_info.remote("num_played_games")) < 1:
             time.sleep(0.1)
-        # 启动一个异步操作，从回放缓冲区中获取下一个训练批次。
+
         next_batch = replay_buffer.get_batch.remote()
         # Training loop
         while self.training_step < self.config.training_steps and not ray.get(
@@ -84,7 +71,6 @@ class Trainer:
             index_batch, batch = ray.get(next_batch)
             next_batch = replay_buffer.get_batch.remote()
             self.update_lr()
-            # 调用 update_weights 方法执行一个训练步骤，计算损失并更新模型权重。
             (
                 priorities,
                 total_loss,
@@ -95,7 +81,6 @@ class Trainer:
             ) = self.update_weights(batch)
 
             if self.config.PER:
-                # 如果配置中启用了 PER（self.config.PER），更新回放缓冲区中的优先级：
                 # Save new priorities in the replay buffer (See https://arxiv.org/abs/1803.00933)
                 replay_buffer.update_priorities.remote(priorities, index_batch)
 
@@ -123,10 +108,9 @@ class Trainer:
                 }
             )
 
-            # Managing the self-play / training ratio  根据配置的训练延迟进行等待：
+            # Managing the self-play / training ratio
             if self.config.training_delay:
                 time.sleep(self.config.training_delay)
-            # 如果配置了训练步数与自我对弈步数的比率，进行检查和等待：
             if self.config.ratio:
                 while (
                     self.training_step

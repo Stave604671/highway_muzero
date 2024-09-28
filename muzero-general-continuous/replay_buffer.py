@@ -334,8 +334,6 @@ class Reanalyse:
         # Initialize the network
         self.model = models.MuZeroNetwork(self.config)
         self.model.set_weights(initial_checkpoint["weights"])
-        # self.model.to(torch.device("cpu"))
-        #
         self.model.to(torch.device("cuda" if self.config.reanalyse_on_gpu else "cpu"))
         self.model.eval()
 

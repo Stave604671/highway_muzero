@@ -13,23 +13,25 @@ Each environment comes with a *default* observation, which can be changed or cus
 import gymnasium as gym
 import highway_env
 
-env = gym.make('highway-v0')
-env.configure({
-    "observation": {
-        "type": "OccupancyGrid",
-        "vehicles_count": 15,
-        "features": ["presence", "x", "y", "vx", "vy", "cos_h", "sin_h"],
-        "features_range": {
-            "x": [-100, 100],
-            "y": [-100, 100],
-            "vx": [-20, 20],
-            "vy": [-20, 20]
-        },
-        "grid_size": [[-27.5, 27.5], [-27.5, 27.5]],
-        "grid_step": [5, 5],
-        "absolute": False
+env = gym.make(
+    'highway-v0',
+    config={
+        "observation": {
+            "type": "OccupancyGrid",
+            "vehicles_count": 15,
+            "features": ["presence", "x", "y", "vx", "vy", "cos_h", "sin_h"],
+            "features_range": {
+                "x": [-100, 100],
+                "y": [-100, 100],
+                "vx": [-20, 20],
+                "vy": [-20, 20]
+            },
+            "grid_size": [[-27.5, 27.5], [-27.5, 27.5]],
+            "grid_step": [5, 5],
+            "absolute": False
+        }
     }
-})
+)
 env.reset()
 ```
 
@@ -124,8 +126,7 @@ vehicle and 0 for placeholders.
             "order": "sorted"
         }
     }
-    env = gym.make('highway-v0')
-    env.configure(config)
+    env = gym.make('highway-v0', config=config)
     obs, info = env.reset()
     print(obs)
 
@@ -146,7 +147,7 @@ The RGB to grayscale conversion is a weighted sum, configured by the `weights` p
 
     from matplotlib import pyplot as plt
     %matplotlib inline
- config = {
+    config = {
         "observation": {
             "type": "GrayscaleObservation",
             "observation_shape": (128, 64),
@@ -156,7 +157,7 @@ The RGB to grayscale conversion is a weighted sum, configured by the `weights` p
         },
         "policy_frequency": 2
     }
-    env.configure(config)
+    env = gym.make('highway-v0', config=config)
     obs, info = env.reset()
 
     fig, axes = plt.subplots(ncols=4, figsize=(12, 5))
@@ -173,7 +174,7 @@ We illustrate the stack update by performing three steps in the environment.
 .. jupyter-execute::
 
     for _ in range(3):
-        obs, reward, done, truncated, info = env.step(env.action_type.actions_indexes["IDLE"])
+        obs, reward, done, truncated, info = env.step(env.unwrapped.action_type.actions_indexes["IDLE"])
 
         fig, axes = plt.subplots(ncols=4, figsize=(12, 5))
         for i, ax in enumerate(axes.flat):
@@ -245,10 +246,10 @@ For instance, consider a vehicle at 25m on the right-lane of the ego-vehicle and
 ```{eval-rst}
 .. table:: $15$ m/s
 
-==  ==  ==  ==  ==  ==  ==  ==  ==  ==  
-0   0   0   0   0   0   0   0   0   0  
-0   0   0   0   0   0   0   0   0   0  
-0   0   0   0   0   0   0   0   0   0  
+==  ==  ==  ==  ==  ==  ==  ==  ==  ==
+0   0   0   0   0   0   0   0   0   0
+0   0   0   0   0   0   0   0   0   0
+0   0   0   0   0   0   0   0   0   0
 ==  ==  ==  ==  ==  ==  ==  ==  ==  ==
 ```
 
@@ -287,18 +288,18 @@ The top row corresponds to the left-lane, the middle row corresponds to the lane
 
 The {py:class}`~highway_env.envs.common.observation.LidarObservation` divides the space around the vehicle into angular sectors, and returns an array with one row per angular sector and two columns:
   - distance to the nearest collidable object (vehicles or obstacles)
-  - component of the objects's relative velocity along that direction 
+  - component of the objects's relative velocity along that direction
 
-The angular sector of index 0 corresponds to an angle 0 (east), and then each index/sector increases the angle (south, west, north). 
+The angular sector of index 0 corresponds to an angle 0 (east), and then each index/sector increases the angle (south, west, north).
 
 For example, for a grid of 8 cells, an obstacle 10 meters away in the south and moving towards the north at 1m/s would lead to the following observation:
-    
+
 ```{eval-rst}
-.. table:: the Lidar observation 
+.. table:: the Lidar observation
 
     ===   ===
-    0     0 
-    0     0 
+    0     0
+    0     0
     10    -1
     0     0
     0     0
@@ -324,7 +325,7 @@ Here is an example of what the distance grid may look like in the parking env:
             "vehicles_count": 3,
         })
     env.reset()
-    
+
     plt.imshow(env.render())
     plt.show()
 ```

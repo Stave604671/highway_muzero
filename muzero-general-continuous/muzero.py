@@ -1,5 +1,4 @@
 import copy
-import datetime
 import importlib
 import json
 import math
@@ -13,7 +12,7 @@ import numpy
 import ray
 import torch
 from torch.utils.tensorboard import SummaryWriter
-from ray import logger
+
 import models
 import replay_buffer
 import self_play
@@ -129,7 +128,6 @@ class MuZero:
         self.reanalyse_worker = None
         self.replay_buffer_worker = None
         self.shared_storage_worker = None
-        logger.info(f"{torch.cuda.is_available()}--cudause34")
 
     def train(self, log_in_tensorboard=True):
         """
@@ -214,7 +212,6 @@ class MuZero:
         Keep track of the training performance.
         """
         # Launch the test worker to get performance metrics
-        logger.info("we begin to test model")
         self.test_worker = self_play.SelfPlay.options(
             num_cpus=0,
             num_gpus=num_gpus,
@@ -395,12 +392,11 @@ class MuZero:
         muzero_player = muzero_player if muzero_player else self.config.muzero_player
         self_play_worker = self_play.SelfPlay.options(
             num_cpus=0,
-            num_gpus=1,
+            num_gpus=num_gpus,
         ).remote(self.checkpoint, self.Game, self.config, numpy.random.randint(10000))
         results = []
         for i in range(num_tests):
             print(f"Testing {i+1}/{num_tests}")
-            logger.info(f"规划时间1{datetime.datetime.now()}")
             results.append(
                 ray.get(
                     self_play_worker.play_game.remote(
@@ -412,7 +408,6 @@ class MuZero:
                     )
                 )
             )
-            logger.info(f"规划时间末尾2{datetime.datetime.now()}")
         self_play_worker.close_game.remote()
 
         if len(self.config.players) == 1:
@@ -473,8 +468,7 @@ class MuZero:
 
 @ray.remote(num_cpus=0, num_gpus=0)
 class CPUActor:
-    # 即使有GPU，强制DataParallel留在CPU上以获得CPU上的权重的技巧
-    # Trick to force to stay on CPU to get weights on CPU even if there is a GPU
+    # Trick to force DataParallel to stay on CPU to get weights on CPU even if there is a GPU
     def __init__(self):
         pass
 
@@ -688,8 +682,8 @@ if __name__ == "__main__":
                 del muzero
                 budget = 20
                 parallel_experiments = 2
-                lr_init = nevergrad.p.Log(lower=0.0001, upper=0.01)
-                discount = nevergrad.p.Log(lower=0.9, upper=0.9999)
+                lr_init = nevergrad.p.Log(lower=0.0001, upper=0.1)
+                discount = nevergrad.p.Log(lower=0.95, upper=0.9999)
                 parametrization = nevergrad.p.Dict(lr_init=lr_init, discount=discount)
                 best_hyperparameters = hyperparameter_search(
                     game_name, parametrization, budget, parallel_experiments, 20

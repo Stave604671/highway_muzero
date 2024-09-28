@@ -4,7 +4,8 @@ import gymnasium as gym
 
 import highway_env
 
-highway_env.register_highway_envs()
+
+gym.register_envs(highway_env)
 
 
 def wrapper(func, *args, **kwargs):
@@ -34,7 +35,7 @@ def test_running_time(repeat=1):
         env = gym.make(env_name)
         time_simulated = steps / env.unwrapped.config["policy_frequency"]
         real_time_ratio = time_simulated / time_spent
-        print("Real time ratio for {}: {}".format(env_name, real_time_ratio))
+        print(f"Real time ratio for {env_name}: {real_time_ratio}")
         assert real_time_ratio > 0.5  # let's not be too ambitious for now
 
 
