@@ -392,7 +392,7 @@ class MuZero:
         muzero_player = muzero_player if muzero_player else self.config.muzero_player
         self_play_worker = self_play.SelfPlay.options(
             num_cpus=0,
-            num_gpus=num_gpus,
+            num_gpus=1,
         ).remote(self.checkpoint, self.Game, self.config, numpy.random.randint(10000))
         results = []
         for i in range(num_tests):

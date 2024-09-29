@@ -146,8 +146,8 @@ class Game(AbstractGame):
                                 'policy_frequency': 12,  # 策略频率
                                 # 纵向决策：IDM（智能驾驶模型）根据前车的距离和速度计算出加速度。
                                 'other_vehicles_type': 'highway_env.vehicle.behavior.IDMVehicle',
-                                'screen_width': 1200,  # 屏幕宽度
-                                'screen_height': 900,  # 屏幕高度
+                                'screen_width': 900,  # 屏幕宽度
+                                'screen_height': 600,  # 屏幕高度
                                 'centering_position': [0.3, 0.5],  # 初始缩放比例
                                 'scaling': 5.5,  # 偏移量
                                 'show_trajectories': False,  # 是否记录车辆最近的轨迹并显示

@@ -1,3 +1,4 @@
+import datetime
 import math
 import time
 
@@ -280,16 +281,16 @@ class MCTS:
                 log_std,
                 hidden_state,
             ) = model.initial_inference(observation)
-            if render:
-                print("input", observation)
-                print(
-                    "root_predicted_value",
-                    models.support_to_scalar(
-                        root_predicted_value, self.config.support_size
-                    ),
-                )
-                print("mu", mu)
-                print("sigma", log_std)
+            # if render:
+            #     print("input", observation)
+            #     print(
+            #         "root_predicted_value",
+            #         models.support_to_scalar(
+            #             root_predicted_value, self.config.support_size
+            #         ),
+            #     )
+            #     print("mu", mu)
+            #     print("sigma", log_std)
             root_predicted_value = models.support_to_scalar(
                 root_predicted_value, self.config.support_size
             ).item()
