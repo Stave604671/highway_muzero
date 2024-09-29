@@ -156,9 +156,11 @@ class Vehicle(RoadObject):
 
     def get_nearby_obstacles(self, distance_threshold: float = 10.0) -> list[RoadObject]:
         nearby_obstacles = []
+        self_pos = np.array(self.position)  # 确保是 numpy 数组
         for obj in self.road.vehicles:  # 假设车辆也算作障碍物
             if isinstance(obj, RoadObject) and obj is not self:  # 排除自身
-                distance = np.linalg.norm(obj.position - self.position)
+                obj_pos = np.array(obj.position)  # 确保是 numpy 数组
+                distance = np.linalg.norm(obj_pos - self_pos)
                 if distance < distance_threshold:
                     nearby_obstacles.append(obj)
         return nearby_obstacles
@@ -174,7 +176,7 @@ class Vehicle(RoadObject):
         :param dt: timestep of integration of the model [s]
         """
         # print(f"{type(self.road.vehicles)}?????-----")
-        obstacles = self.get_nearby_obstacles(self.position)  # 伪代码，获取障碍物
+        obstacles = self.get_nearby_obstacles()  # 伪代码，获取障碍物
         if obstacles:
             closest_obstacle = min(obstacles, key=lambda obs: np.linalg.norm(obs.position - self.position))
             direction_to_obstacle = closest_obstacle.position - self.position
