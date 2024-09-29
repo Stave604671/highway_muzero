@@ -14,22 +14,6 @@ from highway_env.vehicle.kinematics import Vehicle
 Observation = np.ndarray
 
 
-class PIDController:
-    def __init__(self, Kp: float, Ki: float, Kd: float) -> None:
-        self.Kp = Kp
-        self.Ki = Ki
-        self.Kd = Kd
-        self.last_error = 0
-        self.integral = 0
-
-    def update(self, target_heading: float, current_heading: float, dt: float) -> float:
-        error = target_heading - current_heading
-        self.integral += error * dt
-        derivative = (error - self.last_error) / dt
-        self.last_error = error
-        return self.Kp * error + self.Ki * self.integral + self.Kd * derivative
-
-
 class HighwayEnv(AbstractEnv):
     """
     A highway driving environment.
@@ -169,11 +153,6 @@ class HighwayEnv(AbstractEnv):
         """The episode is truncated if the time limit is reached."""
         return self.time >= self.config["duration"]
 
-    def control_vehicle(self, target_heading: float) -> None:
-        dt = 0.1  # 时间间隔
-        pid_controller = PIDController(Kp=1.0, Ki=0.1, Kd=0.05)
-        steering_output = pid_controller.update(target_heading, self.vehicle.heading, dt)
-        self.vehicle.steering = np.clip(steering_output, -1.0, 1.0)  # 假设转向范围在 -1 到 1 之间
 
 
 class HighwayEnvFast(HighwayEnv):

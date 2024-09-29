@@ -10,6 +10,31 @@ from highway_env.utils import Vector
 from highway_env.vehicle.objects import RoadObject
 
 
+class PIDController:
+    def __init__(self, Kp: float, Ki: float, Kd: float, integral_limit: float = None) -> None:
+        self.Kp = Kp
+        self.Ki = Ki
+        self.Kd = Kd
+        self.last_error = 0
+        self.integral = 0
+        self.integral_limit = integral_limit
+
+    def update(self, target_heading: float, current_heading: float, dt: float) -> float:
+        if dt <= 0:
+            raise ValueError("dt must be greater than zero")
+
+        error = target_heading - current_heading
+        self.integral += error * dt
+
+        if self.integral_limit is not None:
+            self.integral = max(min(self.integral, self.integral_limit), -self.integral_limit)
+
+        derivative = (error - self.last_error) / dt
+        self.last_error = error
+
+        return self.Kp * error + self.Ki * self.integral + self.Kd * derivative
+
+
 class Vehicle(RoadObject):
     """
     A moving vehicle on a road, and its kinematics.
@@ -38,6 +63,7 @@ class Vehicle(RoadObject):
         heading: float = 0,
         speed: float = 0,
         predition_type: str = "constant_steering",
+        pid_controller: PIDController = None
     ):
         super().__init__(road, position, heading, speed)
         self.prediction_type = predition_type
@@ -46,6 +72,7 @@ class Vehicle(RoadObject):
         self.impact = None
         self.log = []
         self.history = deque(maxlen=self.HISTORY_SIZE)
+        self.pid_controller = pid_controller if pid_controller else PIDController(1.0, 0.1, 0.05)  # 默认 PID 参数
 
     @classmethod
     def create_random(
@@ -127,6 +154,15 @@ class Vehicle(RoadObject):
         if action:
             self.action = action
 
+    def get_nearby_obstacles(self, distance_threshold: float = 10.0) -> list[RoadObject]:
+        nearby_obstacles = []
+        for obj in self.road.vehicles:  # 假设车辆也算作障碍物
+            if isinstance(obj, RoadObject) and obj is not self:  # 排除自身
+                distance = np.linalg.norm(obj.position - self.position)
+                if distance < distance_threshold:
+                    nearby_obstacles.append(obj)
+        return nearby_obstacles
+
     def step(self, dt: float) -> None:
         """
         Propagate the vehicle state given its actions.
@@ -137,6 +173,18 @@ class Vehicle(RoadObject):
 
         :param dt: timestep of integration of the model [s]
         """
+        # print(f"{type(self.road.vehicles)}?????-----")
+        obstacles = self.get_nearby_obstacles(self.position)  # 伪代码，获取障碍物
+        if obstacles:
+            closest_obstacle = min(obstacles, key=lambda obs: np.linalg.norm(obs.position - self.position))
+            direction_to_obstacle = closest_obstacle.position - self.position
+            target_heading = np.arctan2(direction_to_obstacle[1], direction_to_obstacle[0]) + np.pi / 2  # 目标航向调整
+
+            # 通过 PID 控制器更新方向
+            self.action["steering"] = self.pid_controller.update(target_heading, self.heading, dt)
+        else:
+            target_heading = self.heading  # 如果没有障碍物，保持当前航向
+
         self.clip_actions()
         delta_f = self.action["steering"]
         beta = np.arctan(1 / 2 * np.tan(delta_f))
