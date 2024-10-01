@@ -18,11 +18,11 @@ LaneIndex = Tuple[str, str, int]
 class RoadObject(ABC):
     """
     Common interface for objects that appear on the road.
-
+    表示道路上的对象（如车辆或障碍物）
     For now we assume all objects are rectangular.
     """
 
-    LENGTH: float = 2  # Object length [m]
+    LENGTH: float = 2  # Object length [m]   观测对象的长宽
     WIDTH: float = 2  # Object width [m]
 
     def __init__(
@@ -91,8 +91,8 @@ class RoadObject(ABC):
     def handle_collisions(self, other: RoadObject, dt: float = 0) -> None:
         """
         Check for collision with another vehicle.
-
-        :param other: the other vehicle or object
+        检测和其他车辆是否出现了碰撞，并根据碰撞的情况检测对象的状态
+        :param other: the other vehicle or object，
         :param dt: timestep to check for future collisions (at constant velocity)
         """
         if other is self or not (self.check_collisions or other.check_collisions):
@@ -182,7 +182,7 @@ class RoadObject(ABC):
     def lane_distance_to(self, other: RoadObject, lane: AbstractLane = None) -> float:
         """
         Compute the signed distance to another object along a lane.
-
+        计算与其他对象在车道上的距离
         :param other: the other object
         :param lane: a lane
         :return: the distance to the other other [m]

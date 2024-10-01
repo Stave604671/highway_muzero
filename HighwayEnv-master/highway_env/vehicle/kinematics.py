@@ -63,12 +63,14 @@ class Vehicle(RoadObject):
         heading: float = 0,
         speed: float = 0,
         predition_type: str = "constant_steering",
-        pid_controller: PIDController = None
+        pid_controller: PIDController = None,
+        is_observed: bool = False
     ):
         super().__init__(road, position, heading, speed)
         self.prediction_type = predition_type
         self.action = {"steering": 0, "acceleration": 0}
         self.crashed = False
+        self.is_observed = is_observed
         self.impact = None
         self.log = []
         self.history = deque(maxlen=self.HISTORY_SIZE)
@@ -83,6 +85,7 @@ class Vehicle(RoadObject):
         lane_to: str | None = None,
         lane_id: int | None = None,
         spacing: float = 1,
+        is_observed: bool = False
     ) -> Vehicle:
         """
         Create a random vehicle on the road.
@@ -96,6 +99,7 @@ class Vehicle(RoadObject):
         :param lane_to: end node of the lane to spawn in
         :param lane_id: id of the lane to spawn in
         :param spacing: ratio of spacing to the front vehicle, 1 being the default
+        :param is_observed: 是否是观测车辆
         :return: A vehicle with random position and/or speed
         """
         _from = lane_from or road.np_random.choice(list(road.network.graph.keys()))
@@ -127,7 +131,7 @@ class Vehicle(RoadObject):
             else 3 * offset
         )
         x0 += offset * road.np_random.uniform(0.9, 1.1)
-        v = cls(road, lane.position(x0, 0), lane.heading_at(x0), speed)
+        v = cls(road, lane.position(x0, 0), lane.heading_at(x0), speed, is_observed)
         return v
 
     @classmethod
@@ -168,24 +172,21 @@ class Vehicle(RoadObject):
     def step(self, dt: float) -> None:
         """
         Propagate the vehicle state given its actions.
-
-        Integrate a modified bicycle model with a 1st-order response on the steering wheel dynamics.
-        If the vehicle is crashed, the actions are overridden with erratic steering and braking until complete stop.
-        The vehicle's current lane is updated.
-
-        :param dt: timestep of integration of the model [s]
         """
-        # print(f"{type(self.road.vehicles)}?????-----")
-        obstacles = self.get_nearby_obstacles()  # 伪代码，获取障碍物
-        if obstacles:
-            closest_obstacle = min(obstacles, key=lambda obs: np.linalg.norm(obs.position - self.position))
-            direction_to_obstacle = closest_obstacle.position - self.position
-            target_heading = np.arctan2(direction_to_obstacle[1], direction_to_obstacle[0]) + np.pi / 2  # 目标航向调整
+        if self.is_observed:
+            obstacles = self.get_nearby_obstacles()  # 获取障碍物
+            if obstacles:
+                closest_obstacle = min(obstacles, key=lambda obs: np.linalg.norm(obs.position - self.position))
+                direction_to_obstacle = closest_obstacle.position - self.position
+                target_heading = np.arctan2(direction_to_obstacle[1], direction_to_obstacle[0]) + np.pi / 2  # 目标航向调整
 
-            # 通过 PID 控制器更新方向
-            self.action["steering"] = self.pid_controller.update(target_heading, self.heading, dt)
+                # 通过 PID 控制器更新方向
+                self.action["steering"] = self.pid_controller.update(target_heading, self.heading, dt)
+            else:
+                # 如果没有障碍物，保持直线前进
+                self.action["steering"] = 0  # 重置转向
         else:
-            target_heading = self.heading  # 如果没有障碍物，保持当前航向
+            self.action["steering"] = 0  # 如果不是观察车辆，保持直线前进
 
         self.clip_actions()
         delta_f = self.action["steering"]
