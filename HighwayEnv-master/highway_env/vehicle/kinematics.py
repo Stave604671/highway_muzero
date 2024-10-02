@@ -8,7 +8,7 @@ import numpy as np
 from highway_env.road.road import Road
 from highway_env.utils import Vector
 from highway_env.vehicle.objects import RoadObject
-
+from highway_env.envs.highway_env import HighwayEnv
 
 class PIDController:
     def __init__(self, Kp: float, Ki: float, Kd: float, integral_limit: float = None) -> None:
@@ -175,9 +175,13 @@ class Vehicle(RoadObject):
         Propagate the vehicle state given its actions.
         """
         #print("不能连step这个函数都没进来吧")
-
+        # 初始化环境
+        env = HighwayEnv()
+        # 创建车辆并获取 is_observed 的返回值
+        is_observed_value = env._create_vehicles(is_observed=True)
+        # 打印返回的 is_observed 值
+        print(is_observed_value)  # True
         if not self.is_observed:
-            print("看看是啥：",not self.is_observed)
             obstacles = self.get_nearby_obstacles()  # 获取障碍物
             #print("看看这个if有没有")
             if obstacles:
