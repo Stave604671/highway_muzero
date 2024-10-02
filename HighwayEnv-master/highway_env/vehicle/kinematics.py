@@ -49,9 +49,9 @@ class Vehicle(RoadObject):
     """ Vehicle width [m] """
     DEFAULT_INITIAL_SPEEDS = [23, 25]
     """ Range for random initial speeds [m/s] """
-    MAX_SPEED = 40.0
+    MAX_SPEED = 90.0
     """ Maximum reachable speed [m/s] """
-    MIN_SPEED = -40.0
+    MIN_SPEED = 10
     """ Minimum reachable speed [m/s] """
     HISTORY_SIZE = 30
     """ Length of the vehicle state history, for trajectory display"""
@@ -74,7 +74,7 @@ class Vehicle(RoadObject):
         self.impact = None
         self.log = []
         self.history = deque(maxlen=self.HISTORY_SIZE)
-        self.pid_controller = pid_controller if pid_controller else PIDController(1.0, 0.1, 0.05)  # 默认 PID 参数
+        self.pid_controller = pid_controller if pid_controller else PIDController(3, 0.05, 0.2)  # 默认 PID 参数
 
     @classmethod
     def create_random(
@@ -158,49 +158,63 @@ class Vehicle(RoadObject):
         if action:
             self.action = action
 
-    def get_nearby_obstacles(self, distance_threshold: float = 10.0) -> list[RoadObject]:
-        nearby_obstacles = []
+    def get_nearby_obstacles(self, distance_threshold: float = LENGTH) -> list[RoadObject]:
+        nearby_obstacles = []#将当前车辆的位置 self.position 转换为一个 NumPy 数组，确保后续可以进行矢量运算。self.position 应该是当前车辆在道路上的二维坐标。
         self_pos = np.array(self.position)  # 确保是 numpy 数组
-        for obj in self.road.vehicles:  # 假设车辆也算作障碍物
+        for obj in self.road.vehicles:  # 假设车辆也算作障碍物，这个循环遍历 self.road.vehicles 中的所有车辆。self.road 表示当前车辆所在的道路，self.road.vehicles 是该道路上所有车辆的列表。
             if isinstance(obj, RoadObject) and obj is not self:  # 排除自身
                 obj_pos = np.array(obj.position)  # 确保是 numpy 数组
                 distance = np.linalg.norm(obj_pos - self_pos)
-                if distance < distance_threshold:
+                if distance < distance_threshold:#这里不能简单给10，如果是以像素为单位，直线上建议把这个距离给一个车的长度，；考虑到变道后隔壁车道也有车，应该在求一个三角形斜边（有兴趣你自己加）
                     nearby_obstacles.append(obj)
+                    print("")
         return nearby_obstacles
 
     def step(self, dt: float) -> None:
         """
         Propagate the vehicle state given its actions.
         """
-        if self.is_observed:
+        #print("不能连step这个函数都没进来吧")
+
+        if not self.is_observed:
+            print("看看是啥：",not self.is_observed)
             obstacles = self.get_nearby_obstacles()  # 获取障碍物
+            #print("看看这个if有没有")
             if obstacles:
                 closest_obstacle = min(obstacles, key=lambda obs: np.linalg.norm(obs.position - self.position))
                 direction_to_obstacle = closest_obstacle.position - self.position
-                target_heading = np.arctan2(direction_to_obstacle[1], direction_to_obstacle[0]) + np.pi / 2  # 目标航向调整
-
-                # 通过 PID 控制器更新方向
+                target_heading = np.arctan2(direction_to_obstacle[1], direction_to_obstacle[0])  # 去掉 np.pi / 2
                 self.action["steering"] = self.pid_controller.update(target_heading, self.heading, dt)
+                #print("看看有没有正确进if：",self.action["steering"])
             else:
-                # 如果没有障碍物，保持直线前进
-                self.action["steering"] = 0  # 重置转向
+                self.action["steering"] = 0  # 无障碍物时，保持直线行驶
         else:
-            self.action["steering"] = 0  # 如果不是观察车辆，保持直线前进
+            self.action["steering"] = 0  # 非观察车辆时，保持直线行驶
+            print("Fslse")
 
+        # 更新转向角
         self.clip_actions()
-        delta_f = self.action["steering"]
-        beta = np.arctan(1 / 2 * np.tan(delta_f))
-        v = self.speed * np.array(
-            [np.cos(self.heading + beta), np.sin(self.heading + beta)]
-        )
+        delta_f = self.action["steering"]  # 使用 PID 控制的 steering
+        #print("转向角：",delta_f)
+        beta = np.arctan(1 / 2 * np.tan(delta_f))  # 侧滑角
+
+        # 更新位置
+        v = self.speed * np.array([np.cos(self.heading + beta), np.sin(self.heading + beta)])
         self.position += v * dt
+
+        # 碰撞检测
         if self.impact is not None:
             self.position += self.impact
             self.crashed = True
             self.impact = None
-        self.heading += self.speed * np.sin(beta) / (self.LENGTH / 2) * dt
+
+        # 不再手动调整航向，由 PID 控制器负责
+        # self.heading += self.speed * np.sin(beta) / (self.LENGTH / 2) * dt
+
+        # 更新速度
         self.speed += self.action["acceleration"] * dt
+
+        # 调用状态更新
         self.on_state_update()
 
     def clip_actions(self) -> None:
