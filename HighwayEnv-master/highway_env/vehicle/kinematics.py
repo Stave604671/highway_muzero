@@ -204,8 +204,8 @@ class Vehicle(RoadObject):
         self.clip_actions()
         delta_f = self.action["steering"]  # 使用 PID 控制的 steering
         beta = np.arctan(1 / 2 * np.tan(delta_f))  # 侧滑角
-        new_heading = self.heading + self.action["steering"] * dt
-        self.heading = new_heading
+        # new_heading = self.heading + self.action["steering"] * dt
+        self.heading += self.action["steering"] * dt
         # 更新位置
         v = self.speed * np.array([np.cos(self.heading), np.sin(self.heading)])
         self.position += v * dt
@@ -218,6 +218,12 @@ class Vehicle(RoadObject):
 
         # 不再手动调整航向，由 PID 控制器负责
         # self.heading += self.speed * np.sin(beta) / (self.LENGTH / 2) * dt
+        new_lane_index = self.road.network.get_closest_lane_index(self.position, self.heading)
+        if new_lane_index[2] != self.lane_index[2]:
+            # 成功换道后，将航向重置为新的车道的水平方向
+            self.lane_index = new_lane_index
+            self.lane = self.road.network.get_lane(self.lane_index)
+            self.heading = self.lane.heading_at(self.position[0])  # 将航向调整为车道的方向
 
         # 更新速度
         self.speed += self.action["acceleration"] * dt
