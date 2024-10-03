@@ -181,23 +181,33 @@ class Vehicle(RoadObject):
         """
         if self.is_observed:
             obstacles = self.get_nearby_obstacles()  # 获取障碍物
+            print(f"{obstacles}--{len(obstacles)}")
             if obstacles:
                 closest_obstacle = min(obstacles, key=lambda obs: np.linalg.norm(obs.position - self.position))
                 direction_to_obstacle = closest_obstacle.position - self.position
                 target_heading = np.arctan2(direction_to_obstacle[1], direction_to_obstacle[0]) + np.pi/2
+                print(f"{self.lane_index[2]}--{type(self.lane_index[2])}--{target_heading}--{type(target_heading)}")
+                if self.lane_index[2] == 0:
+                    if target_heading < 0:  # 避免向左转，保持直行或向右
+                        target_heading = -target_heading
+                elif self.lane_index[2] == 3:
+                    if target_heading > 0:  # 避免向左转，保持直行或向右
+                        target_heading = -target_heading
                 # print(f"1、看看有没有正确进if{self.action['steering']}：观测车辆车道{self.lane_index[2]}")
                 self.action["steering"] = self.pid_controller.update(target_heading, self.heading, dt)
                 # print("2、看看有没有正确进if：", self.action["steering"])
             else:
+                print(f"{self.action['steering']}")
                 self.action["steering"] = 0  # 无障碍物时，保持直线行驶
         else:
             self.action["steering"] = 0  # 非观察车辆时，保持直线行驶
         self.clip_actions()
         delta_f = self.action["steering"]  # 使用 PID 控制的 steering
         beta = np.arctan(1 / 2 * np.tan(delta_f))  # 侧滑角
-
+        new_heading = self.heading + self.action["steering"] * dt
+        self.heading = new_heading
         # 更新位置
-        v = self.speed * np.array([np.cos(self.heading + beta), np.sin(self.heading + beta)])
+        v = self.speed * np.array([np.cos(self.heading), np.sin(self.heading)])
         self.position += v * dt
 
         # 碰撞检测
