@@ -164,14 +164,14 @@ class Vehicle(RoadObject):
         self_pos = np.array(self.position)  # 确保是 numpy 数组
         for obj_id, obj in enumerate(self.road.vehicles):  # 假设车辆也算作障碍物，这个循环遍历 self.road.vehicles 中的所有车辆。self.road 表示当前车辆所在的道路，self.road.vehicles 是该道路上所有车辆的列表。
             # 如果是非观测车辆
-            if not obj.is_observed:  # 排除自身
+            if not obj.is_observed:
                 # 获取非观测车辆的坐标
                 obj_pos = np.array(obj.position)  # 确保是 numpy 数组
                 # 计算记录
                 distance = np.linalg.norm(obj_pos - self_pos)
-                print(f"观测车辆和车辆{obj_id}的距离：{distance}")
                 # 这里不能简单给10，如果是以像素为单位，直线上建议把这个距离给一个车的长度，考虑到变道后隔壁车道也有车，应该在求一个三角形斜边（有兴趣你自己加）
-                if distance < distance_threshold*2:
+                # print(f"观测车辆车道{self.lane_index[2]}-要避障的车辆的车道-{obj.lane_index[2]}")
+                if distance < distance_threshold*2.5 and self.lane_index[2] == obj.lane_index[2]:
                     nearby_obstacles.append(obj)
         return nearby_obstacles
 
@@ -179,28 +179,21 @@ class Vehicle(RoadObject):
         """
         Propagate the vehicle state given its actions.
         """
-        #print("不能连step这个函数都没进来吧")
-
         if self.is_observed:
-            # print("看看是啥：", self.is_observed)
             obstacles = self.get_nearby_obstacles()  # 获取障碍物
-            print(f"看看这个if有没有{len(obstacles)}")
             if obstacles:
                 closest_obstacle = min(obstacles, key=lambda obs: np.linalg.norm(obs.position - self.position))
                 direction_to_obstacle = closest_obstacle.position - self.position
-                target_heading = np.arctan2(direction_to_obstacle[1], direction_to_obstacle[0])  # 去掉 np.pi / 2
+                target_heading = np.arctan2(direction_to_obstacle[1], direction_to_obstacle[0]) + np.pi/2
+                # print(f"1、看看有没有正确进if{self.action['steering']}：观测车辆车道{self.lane_index[2]}")
                 self.action["steering"] = self.pid_controller.update(target_heading, self.heading, dt)
-                print("看看有没有正确进if：", self.action["steering"])
+                # print("2、看看有没有正确进if：", self.action["steering"])
             else:
                 self.action["steering"] = 0  # 无障碍物时，保持直线行驶
         else:
             self.action["steering"] = 0  # 非观察车辆时，保持直线行驶
-            # print("False")
-
-        # 更新转向角
         self.clip_actions()
         delta_f = self.action["steering"]  # 使用 PID 控制的 steering
-        #print("转向角：",delta_f)
         beta = np.arctan(1 / 2 * np.tan(delta_f))  # 侧滑角
 
         # 更新位置
