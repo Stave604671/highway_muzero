@@ -8,7 +8,7 @@ import numpy as np
 from highway_env.road.road import Road
 from highway_env.utils import Vector
 from highway_env.vehicle.objects import RoadObject
-from highway_env.envs.highway_env import HighwayEnv
+
 
 class PIDController:
     def __init__(self, Kp: float, Ki: float, Kd: float, integral_limit: float = None) -> None:
@@ -160,14 +160,19 @@ class Vehicle(RoadObject):
 
     def get_nearby_obstacles(self, distance_threshold: float = LENGTH) -> list[RoadObject]:
         nearby_obstacles = []#将当前车辆的位置 self.position 转换为一个 NumPy 数组，确保后续可以进行矢量运算。self.position 应该是当前车辆在道路上的二维坐标。
+        # 观测车辆的坐标
         self_pos = np.array(self.position)  # 确保是 numpy 数组
-        for obj in self.road.vehicles:  # 假设车辆也算作障碍物，这个循环遍历 self.road.vehicles 中的所有车辆。self.road 表示当前车辆所在的道路，self.road.vehicles 是该道路上所有车辆的列表。
-            if isinstance(obj, RoadObject) and obj is not self:  # 排除自身
+        for obj_id, obj in enumerate(self.road.vehicles):  # 假设车辆也算作障碍物，这个循环遍历 self.road.vehicles 中的所有车辆。self.road 表示当前车辆所在的道路，self.road.vehicles 是该道路上所有车辆的列表。
+            # 如果是非观测车辆
+            if not obj.is_observed:  # 排除自身
+                # 获取非观测车辆的坐标
                 obj_pos = np.array(obj.position)  # 确保是 numpy 数组
+                # 计算记录
                 distance = np.linalg.norm(obj_pos - self_pos)
-                if distance < distance_threshold:#这里不能简单给10，如果是以像素为单位，直线上建议把这个距离给一个车的长度，；考虑到变道后隔壁车道也有车，应该在求一个三角形斜边（有兴趣你自己加）
+                print(f"观测车辆和车辆{obj_id}的距离：{distance}")
+                # 这里不能简单给10，如果是以像素为单位，直线上建议把这个距离给一个车的长度，考虑到变道后隔壁车道也有车，应该在求一个三角形斜边（有兴趣你自己加）
+                if distance < distance_threshold*2:
                     nearby_obstacles.append(obj)
-                    print("")
         return nearby_obstacles
 
     def step(self, dt: float) -> None:
@@ -175,26 +180,22 @@ class Vehicle(RoadObject):
         Propagate the vehicle state given its actions.
         """
         #print("不能连step这个函数都没进来吧")
-        # 初始化环境
-        env = HighwayEnv()
-        # 创建车辆并获取 is_observed 的返回值
-        is_observed_value = env._create_vehicles(is_observed=True)
-        # 打印返回的 is_observed 值
-        print(is_observed_value)  # True
-        if not self.is_observed:
+
+        if self.is_observed:
+            # print("看看是啥：", self.is_observed)
             obstacles = self.get_nearby_obstacles()  # 获取障碍物
-            #print("看看这个if有没有")
+            print(f"看看这个if有没有{len(obstacles)}")
             if obstacles:
                 closest_obstacle = min(obstacles, key=lambda obs: np.linalg.norm(obs.position - self.position))
                 direction_to_obstacle = closest_obstacle.position - self.position
                 target_heading = np.arctan2(direction_to_obstacle[1], direction_to_obstacle[0])  # 去掉 np.pi / 2
                 self.action["steering"] = self.pid_controller.update(target_heading, self.heading, dt)
-                #print("看看有没有正确进if：",self.action["steering"])
+                print("看看有没有正确进if：", self.action["steering"])
             else:
                 self.action["steering"] = 0  # 无障碍物时，保持直线行驶
         else:
             self.action["steering"] = 0  # 非观察车辆时，保持直线行驶
-            print("Fslse")
+            # print("False")
 
         # 更新转向角
         self.clip_actions()

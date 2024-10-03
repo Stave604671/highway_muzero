@@ -65,7 +65,7 @@ class HighwayEnv(AbstractEnv):
             record_history=self.config["show_trajectories"],
         )
 
-    def _create_vehicles(self, is_observed=False) -> bool:
+    def _create_vehicles(self) -> None:
         """Create some new random vehicles of a given type, and add them on the road."""
         other_vehicles_type = utils.class_from_path(self.config["other_vehicles_type"])
         other_per_controlled = near_split(
@@ -82,7 +82,7 @@ class HighwayEnv(AbstractEnv):
                 is_observed=True,
             )
             vehicle = self.action_type.vehicle_class(
-                self.road, vehicle.position, vehicle.heading, vehicle.speed
+                self.road, vehicle.position, vehicle.heading, vehicle.speed, is_observed=True
             )
             self.controlled_vehicles.append(vehicle)
             self.road.vehicles.append(vehicle)
@@ -93,7 +93,6 @@ class HighwayEnv(AbstractEnv):
                 )
                 vehicle.randomize_behavior()
                 self.road.vehicles.append(vehicle)
-            return is_observed
 
     def _reward(self, action: Action) -> float:
         """
