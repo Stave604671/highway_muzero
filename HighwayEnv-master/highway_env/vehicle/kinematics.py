@@ -4,7 +4,7 @@ import copy
 from collections import deque
 
 import numpy as np
-
+from ray import logger
 from highway_env.road.road import Road
 from highway_env.utils import Vector
 from highway_env.vehicle.objects import RoadObject
@@ -47,11 +47,11 @@ class Vehicle(RoadObject):
     """ Vehicle length [m] """
     WIDTH = 2.0
     """ Vehicle width [m] """
-    DEFAULT_INITIAL_SPEEDS = [23, 25]
+    DEFAULT_INITIAL_SPEEDS = [20, 25]  # 论文要求的初始车速
     """ Range for random initial speeds [m/s] """
-    MAX_SPEED = 90.0
+    MAX_SPEED = 30.0
     """ Maximum reachable speed [m/s] """
-    MIN_SPEED = 10
+    MIN_SPEED = 20.0
     """ Minimum reachable speed [m/s] """
     HISTORY_SIZE = 30
     """ Length of the vehicle state history, for trajectory display"""
@@ -179,14 +179,15 @@ class Vehicle(RoadObject):
         """
         Propagate the vehicle state given its actions.
         """
+
         if self.is_observed:
+            logger.info(f"观测车辆当前车速：{self.speed}")
             obstacles = self.get_nearby_obstacles()  # 获取障碍物
-            print(f"{obstacles}--{len(obstacles)}")
             if obstacles:
                 closest_obstacle = min(obstacles, key=lambda obs: np.linalg.norm(obs.position - self.position))
                 direction_to_obstacle = closest_obstacle.position - self.position
                 target_heading = np.arctan2(direction_to_obstacle[1], direction_to_obstacle[0]) + np.pi/2
-                print(f"{self.lane_index[2]}--{type(self.lane_index[2])}--{target_heading}--{type(target_heading)}")
+                # print(f"{self.lane_index[2]}--{type(self.lane_index[2])}--{target_heading}--{type(target_heading)}")
                 if self.lane_index[2] == 0:
                     if target_heading < 0:  # 避免向左转，保持直行或向右
                         target_heading = -target_heading
@@ -197,16 +198,14 @@ class Vehicle(RoadObject):
                 self.action["steering"] = self.pid_controller.update(target_heading, self.heading, dt)
                 # print("2、看看有没有正确进if：", self.action["steering"])
             else:
-                print(f"{self.action['steering']}")
                 self.action["steering"] = 0  # 无障碍物时，保持直线行驶
         else:
             self.action["steering"] = 0  # 非观察车辆时，保持直线行驶
+
         self.clip_actions()
         delta_f = self.action["steering"]  # 使用 PID 控制的 steering
         beta = np.arctan(1 / 2 * np.tan(delta_f))  # 侧滑角
-        # new_heading = self.heading + self.action["steering"] * dt
         self.heading += self.action["steering"] * dt
-        # 更新位置
         v = self.speed * np.array([np.cos(self.heading), np.sin(self.heading)])
         self.position += v * dt
 
@@ -216,11 +215,12 @@ class Vehicle(RoadObject):
             self.crashed = True
             self.impact = None
 
-        # 不再手动调整航向，由 PID 控制器负责
-        # self.heading += self.speed * np.sin(beta) / (self.LENGTH / 2) * dt
+        # 处理换道逻辑
         new_lane_index = self.road.network.get_closest_lane_index(self.position, self.heading)
         if new_lane_index[2] != self.lane_index[2]:
-            # 成功换道后，将航向重置为新的车道的水平方向
+            # 计算新车道中心位置，假设车道宽度为4
+            target_lane_center_y = (new_lane_index[2] + 0.5) * 4  # 车道宽度为4
+            self.position[1] = target_lane_center_y  # 移动车辆到新车道的中心位置
             self.lane_index = new_lane_index
             self.lane = self.road.network.get_lane(self.lane_index)
             self.heading = self.lane.heading_at(self.position[0])  # 将航向调整为车道的方向
