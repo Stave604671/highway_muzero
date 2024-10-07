@@ -128,18 +128,32 @@ class HighwayEnv(AbstractEnv):
         scaled_speed = utils.lmap(
             forward_speed, self.config["reward_speed_range"], [0, 1]
         )
+
         lane_change_reward = 0
         if hasattr(self.vehicle, 'last_lane_index'):
             if self.vehicle.lane_index[2] != self.vehicle.last_lane_index:
                 lane_change_reward = self.config["lane_change_reward"]
+
+        min_distance_to_other_vehicles = min(
+            [np.linalg.norm(v.position - self.vehicle.position) for v in self.road.vehicles if v != self.vehicle]
+        )
+
+        # Add a reward for keeping safe distance
+        safe_distance_reward = np.clip(min_distance_to_other_vehicles - 12, 0, 1)  # 5 is an example threshold
+
         # 更新 last_lane_index
         self.vehicle.last_lane_index = self.vehicle.lane_index[2]
+
+        low_speed_penalty = -1 if self.vehicle.speed < 23 else 0  # Punish speeds lower than 22
+
         return {
             "collision_reward": float(self.vehicle.crashed),
             "right_lane_reward": lane / max(len(neighbours) - 1, 1),
             "lane_change_reward": lane_change_reward,
-            "high_speed_reward": np.clip(scaled_speed, 0, 1),
+            "high_speed_reward": np.clip(scaled_speed**2, 0, 1),
+            "safe_distance_reward": safe_distance_reward,
             "on_road_reward": float(self.vehicle.on_road),
+            "low_speed_penalty": low_speed_penalty
         }
 
     def _is_terminated(self) -> bool:

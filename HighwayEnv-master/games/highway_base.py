@@ -95,8 +95,8 @@ class MuZeroConfig:
         self.reanalyse_on_gpu = True   # windows下需要都打开，linux没限制
 
         ### Adjust the self play / training ratio to avoid over/underfitting
-        self.self_play_delay = 0  # Number of seconds to wait after each played game
-        self.training_delay = 0  # Number of seconds to wait after each training step
+        self.self_play_delay = 1/100  # Number of seconds to wait after each played game
+        self.training_delay = 1/100  # Number of seconds to wait after each training step
         self.ratio = 1/100  # Desired training steps per self played step ratio. Equivalent to a synchronous version, training can take much longer. Set it to None to disable it
         # fmt: on
 
@@ -164,8 +164,8 @@ class Game(AbstractGame):
                                 'vehicles_density': 1,
                                 "right_lane_reward": 0.5,  # 在最右边的车道上行驶时获得的奖励，在其他车道上线性映射为零。
                                 'collision_reward': -1.5,  # 与车辆相撞时获取的惩罚
-                                'high_speed_reward': 2,  # 维持高速行驶的奖励
-                                'lane_change_reward': -1,  # 换道的惩罚
+                                'high_speed_reward': 2,    # 维持高速行驶的奖励
+                                'lane_change_reward': -0.5,  # 换道的惩罚
                                 'reward_speed_range': [20, 30],  # 高速的奖励从这个范围线性映射到[0,HighwayEnv.HIGH_SPEED_REWARD]。
                                 'offroad_terminal': True  # 车辆偏离道路是否会导致仿真结束
                             })
