@@ -108,52 +108,35 @@ class HighwayEnv(AbstractEnv):
             reward = utils.lmap(
                 reward,
                 [
-                    self.config["collision_reward"] + self.config["lane_change_reward"],
-                    self.config["high_speed_reward"] + self.config["right_lane_reward"],
+                    self.config["collision_reward"] + self.config["lane_change_reward"]+-1,
+                    -self.config["collision_reward"]+1+1,
                 ],
                 [0, 1],
             )
-        reward *= rewards["on_road_reward"]
+        # reward *= rewards["on_road_reward"]
         return reward
 
     def _rewards(self, action: Action) -> dict[str, float]:
-        neighbours = self.road.network.all_side_lanes(self.vehicle.lane_index)
-        lane = (
-            self.vehicle.target_lane_index[2]
-            if isinstance(self.vehicle, ControlledVehicle)
-            else self.vehicle.lane_index[2]
-        )
-        # Use forward speed rather than speed, see https://github.com/eleurent/highway-env/issues/268
-        forward_speed = self.vehicle.speed * np.cos(self.vehicle.heading)
-        scaled_speed = utils.lmap(
-            forward_speed, self.config["reward_speed_range"], [0, 1]
-        )
-
+        # 高速奖励
+        speed_min, speed_max = self.config['reward_speed_range'][0], self.config['reward_speed_range'][1]
+        speed_reward = -1 + 2 * (self.vehicle.speed* np.cos(self.vehicle.heading)-speed_min)/(speed_max-speed_min)
+        # 换道惩罚
         lane_change_reward = 0
         if hasattr(self.vehicle, 'last_lane_index'):
             if self.vehicle.lane_index[2] != self.vehicle.last_lane_index:
                 lane_change_reward = self.config["lane_change_reward"]
-
+        self.vehicle.last_lane_index = self.vehicle.lane_index[2]
+        # 安全距离奖励
         min_distance_to_other_vehicles = min(
             [np.linalg.norm(v.position - self.vehicle.position) for v in self.road.vehicles if v != self.vehicle]
         )
-
-        # Add a reward for keeping safe distance
         safe_distance_reward = np.clip(min_distance_to_other_vehicles - 12, 0, 1)  # 5 is an example threshold
 
-        # 更新 last_lane_index
-        self.vehicle.last_lane_index = self.vehicle.lane_index[2]
-
-        low_speed_penalty = -1 if self.vehicle.speed < 23 else 0  # Punish speeds lower than 22
-
         return {
-            "collision_reward": float(self.vehicle.crashed),
-            "right_lane_reward": lane / max(len(neighbours) - 1, 1),
+            "collision_reward": self.config['collision_reward'] if self.vehicle.crashed else -self.config['collision_reward'],
             "lane_change_reward": lane_change_reward,
-            "high_speed_reward": np.clip(scaled_speed**2, 0, 1),
+            "high_speed_reward": speed_reward,
             "safe_distance_reward": safe_distance_reward,
-            "on_road_reward": float(self.vehicle.on_road),
-            "low_speed_penalty": low_speed_penalty
         }
 
     def _is_terminated(self) -> bool:
