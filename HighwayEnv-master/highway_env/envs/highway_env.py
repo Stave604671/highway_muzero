@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+import ray
 
 from highway_env import utils
 from highway_env.envs.common.abstract import AbstractEnv
@@ -102,7 +103,7 @@ class HighwayEnv(AbstractEnv):
         """
         rewards = self._rewards(action)
         reward = sum(
-            self.config.get(name, 0) * reward for name, reward in rewards.items()
+            reward for name, reward in rewards.items()
         )
         if self.config["normalize_reward"]:
             reward = utils.lmap(
@@ -117,23 +118,31 @@ class HighwayEnv(AbstractEnv):
         return reward
 
     def _rewards(self, action: Action) -> dict[str, float]:
-        # 高速奖励
         speed_min, speed_max = self.config['reward_speed_range'][0], self.config['reward_speed_range'][1]
-        speed_reward = -1 + 2 * (self.vehicle.speed* np.cos(self.vehicle.heading)-speed_min)/(speed_max-speed_min)
+        speed_reward = -1 + 2 * (self.vehicle.speed * np.cos(self.vehicle.heading) - speed_min) / (
+                    speed_max - speed_min)
+
         # 换道惩罚
         lane_change_reward = 0
         if hasattr(self.vehicle, 'last_lane_index'):
             if self.vehicle.lane_index[2] != self.vehicle.last_lane_index:
                 lane_change_reward = self.config["lane_change_reward"]
         self.vehicle.last_lane_index = self.vehicle.lane_index[2]
+
         # 安全距离奖励
         min_distance_to_other_vehicles = min(
             [np.linalg.norm(v.position - self.vehicle.position) for v in self.road.vehicles if v != self.vehicle]
         )
-        safe_distance_reward = np.clip(min_distance_to_other_vehicles - 12, 0, 1)  # 5 is an example threshold
+
+        # 计算动态的安全距离阈值
+        dynamic_safe_distance = 5 + 0.5 * self.vehicle.speed  # d_min = 5, β = 0.5
+
+        # 使用非线性函数计算安全距离奖励
+        safe_distance_reward = 1 - np.exp(-min_distance_to_other_vehicles / dynamic_safe_distance)
 
         return {
-            "collision_reward": self.config['collision_reward'] if self.vehicle.crashed else -self.config['collision_reward'],
+            "not_collision_reward": self.config['not_collision_reward'] if not self.vehicle.crashed else 0,
+            "collision_reward": self.config['collision_reward'] if self.vehicle.crashed else 0,
             "lane_change_reward": lane_change_reward,
             "high_speed_reward": speed_reward,
             "safe_distance_reward": safe_distance_reward,
