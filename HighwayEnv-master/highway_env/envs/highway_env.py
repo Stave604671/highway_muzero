@@ -103,6 +103,8 @@ class HighwayEnv(AbstractEnv):
         :return: the corresponding reward
         """
         rewards = self._rewards(action)
+        if self.vehicle.is_observed:
+            ray.logger.info(f"观测车辆车速{self.vehicle.speed}--{rewards}----name")
         reward = sum(
             self.config.get(name, 0) * reward for name, reward in rewards.items()
         )
