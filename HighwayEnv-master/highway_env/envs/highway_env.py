@@ -39,13 +39,14 @@ class HighwayEnv(AbstractEnv):
                 "duration": 40,  # [s]
                 "ego_spacing": 2,
                 "vehicles_density": 1,
-                "collision_reward": -1,  # The reward received when colliding with a vehicle.
-                "right_lane_reward": 0.1,  # The reward received when driving on the right-most lanes, linearly mapped to
+                "collision_reward": -5,  # The reward received when colliding with a vehicle.
                 # zero for other lanes.
-                "high_speed_reward": 0.4,  # The reward received when driving at full speed, linearly mapped to zero for
+                "high_speed_reward": 1,  # The reward received when driving at full speed, linearly mapped to zero for
                 # lower speeds according to config["reward_speed_range"].
-                "lane_change_reward": 0,  # The reward received at each lane change action.
+                "lane_change_reward": -1,  # The reward received at each lane change action.
                 "reward_speed_range": [20, 30],
+                "safe_distance_reward": 2,
+                'not_collision_reward': 5,
                 "normalize_reward": True,
                 "offroad_terminal": False,
             }
@@ -108,10 +109,8 @@ class HighwayEnv(AbstractEnv):
         if self.config["normalize_reward"]:
             reward = utils.lmap(
                 reward,
-                [
-                    self.config["collision_reward"] + self.config["lane_change_reward"]+-1,
-                    -self.config["collision_reward"]+1+1,
-                ],
+                [self.config['collision_reward'] + self.config["lane_change_reward"] - 1,
+                 self.config['collision_reward'] + 1 + self.config["safe_distance_reward"]],  # reward 的最小值和最大值
                 [0, 1],
             )
         # reward *= rewards["on_road_reward"]
