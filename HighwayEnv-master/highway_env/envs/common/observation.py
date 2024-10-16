@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
+import ray
 from gymnasium import spaces
 
 from highway_env import utils
@@ -126,8 +127,10 @@ class TimeToCollisionObservation(ObservationType):
 
     def observe(self) -> np.ndarray:
         if not self.env.road:
+            num_lanes = min(3, len(self.env.road.network.all_side_lanes(self.observer_vehicle.lane_index)))  # 动态获取车道数
+            num_speeds = min(3, len(self.observer_vehicle.target_speeds))  # 动态获取速度维度
             return np.zeros(
-                (3, 3, int(self.horizon * self.env.config["policy_frequency"]))
+                (num_speeds, num_lanes, int(self.horizon * self.env.config["policy_frequency"]))
             )
         grid = compute_ttc_grid(
             self.env,
@@ -135,19 +138,21 @@ class TimeToCollisionObservation(ObservationType):
             time_quantization=1 / self.env.config["policy_frequency"],
             horizon=self.horizon,
         )
+        # Padding 应根据网格形状进行适配
         padding = np.ones(np.shape(grid))
         padded_grid = np.concatenate([padding, grid, padding], axis=1)
-        obs_lanes = 3
-        l0 = grid.shape[1] + self.observer_vehicle.lane_index[2] - obs_lanes // 2
-        lf = grid.shape[1] + self.observer_vehicle.lane_index[2] + obs_lanes // 2
+        obs_lanes = min(len(self.env.road.network.all_side_lanes(self.observer_vehicle.lane_index)), grid.shape[1])
+        l0 = max(0, self.observer_vehicle.lane_index[2] - obs_lanes // 2)
+        lf = min(grid.shape[1] , self.observer_vehicle.lane_index[2] + obs_lanes // 2)
         clamped_grid = padded_grid[:, l0 : lf + 1, :]
         repeats = np.ones(clamped_grid.shape[0])
         repeats[np.array([0, -1])] += clamped_grid.shape[0]
         padded_grid = np.repeat(clamped_grid, repeats.astype(int), axis=0)
-        obs_speeds = 3
-        v0 = grid.shape[0] + self.observer_vehicle.speed_index - obs_speeds // 2
-        vf = grid.shape[0] + self.observer_vehicle.speed_index + obs_speeds // 2
+        obs_speeds = grid.shape[0]  # 动态获取速度维度
+        v0 = max(0, self.observer_vehicle.speed_index - obs_speeds // 2)
+        vf = min(grid.shape[0] - 1, self.observer_vehicle.speed_index + obs_speeds // 2)
         clamped_grid = padded_grid[v0 : vf + 1, :, :]
+        # ray.logger.info(f"{clamped_grid.shape}")
         return clamped_grid.astype(np.float32)
 
 

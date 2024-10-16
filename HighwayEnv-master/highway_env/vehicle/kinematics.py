@@ -180,7 +180,6 @@ class Vehicle(RoadObject):
         """
         Propagate the vehicle state given its actions.
         """
-
         if self.is_observed:
             logger.info(f"观测车辆当前车速：{self.speed}")
             obstacles = self.get_nearby_obstacles()  # 获取障碍物

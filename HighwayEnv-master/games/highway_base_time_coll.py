@@ -16,7 +16,7 @@ class MuZeroConfig:
         self.max_num_gpus = None  # 固定使用gpu的最大数量.使用单个gpu会更快,没有配置的话会默认使用所有gpu
 
         # Game
-        self.observation_shape = (3, 3, 10)  # 游戏观测空间的维度,如果观测空间三维无所谓,如果是一维,需要配成(1,1,x)
+        self.observation_shape = (6, 4, 100)  # 游戏观测空间的维度,如果观测空间三维无所谓,如果是一维,需要配成(1,1,x)
         self.action_space = 2  # 动作空间的大小
         self.players = [i for i in range(1)]  # 玩家的数量,车辆换道场景观测和控制车辆只有一个,为1就行
         self.stacked_observations = 0  # 观测时叠加的历史观察数量（包括过去的动作）。
@@ -129,14 +129,14 @@ class Game(AbstractGame):
                             config={  # 需要在程序启动这个观测器之前使用自定义的公式来对观测车辆的初始速度和初始位置进行初始化
                                 'observation': {
                                     'type': 'TimeToCollision',
-                                    'horizon': 10,
+                                    'horizon': 20,
                                 },
                                 # 'action': {'type': 'DiscreteMetaAction'},
                                 'action': {'type': 'ContinuousAction',
                                            'acceleration_range': (-4, 4.0),
                                            'steering_range': (-np.pi / 12, np.pi / 12)},  # 为它扩展一个能够控制横向加速度和纵向加速度的子类
                                 'simulation_frequency': 15,  # 模拟频率
-                                'policy_frequency': 1,  # 策略频率
+                                'policy_frequency': 5,  # 策略频率
                                 # 纵向决策：IDM（智能驾驶模型）根据前车的距离和速度计算出加速度。
                                 'other_vehicles_type': 'highway_env.vehicle.behavior.IDMVehicle',
                                 'screen_width': 900,  # 屏幕宽度
@@ -179,7 +179,7 @@ class Game(AbstractGame):
         # action = numpy.tanh(action)
         observation, reward, done, _, _ = self.env.step(action)
         # observation = observation.reshape((147,))
-        # logger.info(f"end step: {datetime.datetime.now()}")
+        # logger.info(f"end step: {observation.shape}--{datetime.datetime.now()}")
         return observation, reward, done
 
     def reset(self):
