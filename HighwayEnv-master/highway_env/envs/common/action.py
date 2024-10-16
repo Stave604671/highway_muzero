@@ -134,7 +134,7 @@ class ContinuousAction(ActionType):
 
     @property
     def vehicle_class(self) -> Callable:
-        return Vehicle if not self.dynamical else BicycleVehicle
+        return functools.partial(MDPVehicle, target_speeds=self.target_speeds)
 
     def get_action(self, action: np.ndarray):
         if self.clip:
