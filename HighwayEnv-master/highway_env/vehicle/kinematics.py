@@ -65,13 +65,13 @@ class Vehicle(RoadObject):
         speed: float = 0,
         predition_type: str = "constant_steering",
         pid_controller: PIDController = None,
-        is_observed: bool = False
+        **kwargs
     ):
         super().__init__(road, position, heading, speed)
         self.prediction_type = predition_type
         self.action = {"steering": 0, "acceleration": 0}
         self.crashed = False
-        self.is_observed = is_observed
+        self.is_observed = kwargs.get('is_observed', False)
         self.impact = None
         self.log = []
         self.history = deque(maxlen=self.HISTORY_SIZE)

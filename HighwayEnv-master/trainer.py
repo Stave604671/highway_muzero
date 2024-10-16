@@ -289,8 +289,8 @@ class Trainer:
         # Scale the value loss and the entropy loss
         loss = (
             value_loss * self.config.value_loss_weight
-            + reward_loss
-            + policy_loss
+            + reward_loss * self.config.reward_loss_weight
+            + policy_loss * self.config.policy_loss_weight
             + entropy_loss * self.config.entropy_loss_weight
         )
 

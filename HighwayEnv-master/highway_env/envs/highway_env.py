@@ -84,7 +84,7 @@ class HighwayEnv(AbstractEnv):
                 is_observed=True,
             )
             vehicle = self.action_type.vehicle_class(
-                self.road, vehicle.position, vehicle.heading, vehicle.speed, is_observed=True
+                self.road, vehicle.position, vehicle.heading, vehicle.speed
             )
             self.controlled_vehicles.append(vehicle)
             self.road.vehicles.append(vehicle)

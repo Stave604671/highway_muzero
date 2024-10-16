@@ -84,6 +84,7 @@ class ContinuousAction(ActionType):
 
     STEERING_RANGE = (-np.pi / 4, np.pi / 4)
     """Steering angle range: [-x, x], in rad."""
+    DEFAULT_TARGET_SPEEDS = np.array([20, 22, 24, 26, 28, 30])  # 增加默认的目标速度集
 
     def __init__(
         self,
@@ -95,6 +96,7 @@ class ContinuousAction(ActionType):
         lateral: bool = True,
         dynamical: bool = False,
         clip: bool = True,
+        target_speeds: np.ndarray = None,  # 新增参数target_speeds
         **kwargs,
     ) -> None:
         """
@@ -125,6 +127,7 @@ class ContinuousAction(ActionType):
         self.clip = clip
         self.size = 2 if self.lateral and self.longitudinal else 1
         self.last_action = np.zeros(self.size)
+        self.target_speeds = target_speeds if target_speeds is not None else self.DEFAULT_TARGET_SPEEDS
 
     def space(self) -> spaces.Box:
         return spaces.Box(-1.0, 1.0, shape=(self.size,), dtype=np.float32)
