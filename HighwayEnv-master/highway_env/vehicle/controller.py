@@ -91,45 +91,51 @@ class ControlledVehicle(Vehicle):
         Perform a high-level action to change the desired lane or speed.
 
         - If a high-level action is provided, update the target speed and lane;
-        - then, perform longitudinal and lateral control.
+        - If the action is a continuous one (dict), update steering and acceleration;
+        - Then, perform longitudinal and lateral control.
 
-        :param action: a high-level action
+        :param action: a high-level action (string) or a continuous action (dict)
         """
         self.follow_road()
-        if action == "FASTER":
-            self.target_speed += self.DELTA_SPEED
-        elif action == "SLOWER":
-            self.target_speed -= self.DELTA_SPEED
-        elif action == "LANE_RIGHT":
-            _from, _to, _id = self.target_lane_index
-            target_lane_index = (
-                _from,
-                _to,
-                np.clip(_id + 1, 0, len(self.road.network.graph[_from][_to]) - 1),
-            )
-            if self.road.network.get_lane(target_lane_index).is_reachable_from(
-                self.position
-            ):
-                self.target_lane_index = target_lane_index
-        elif action == "LANE_LEFT":
-            _from, _to, _id = self.target_lane_index
-            target_lane_index = (
-                _from,
-                _to,
-                np.clip(_id - 1, 0, len(self.road.network.graph[_from][_to]) - 1),
-            )
-            if self.road.network.get_lane(target_lane_index).is_reachable_from(
-                self.position
-            ):
-                self.target_lane_index = target_lane_index
 
-        action = {
-            "steering": self.steering_control(self.target_lane_index),
-            "acceleration": self.speed_control(self.target_speed),
-        }
-        action["steering"] = np.clip(
-            action["steering"], -self.MAX_STEERING_ANGLE, self.MAX_STEERING_ANGLE
-        )
+        if isinstance(action, str):
+            # Handle discrete actions
+            if action == "FASTER":
+                self.target_speed += self.DELTA_SPEED
+            elif action == "SLOWER":
+                self.target_speed -= self.DELTA_SPEED
+            elif action == "LANE_RIGHT":
+                _from, _to, _id = self.target_lane_index
+                target_lane_index = (
+                    _from,
+                    _to,
+                    np.clip(_id + 1, 0, len(self.road.network.graph[_from][_to]) - 1),
+                )
+                if self.road.network.get_lane(target_lane_index).is_reachable_from(self.position):
+                    self.target_lane_index = target_lane_index
+            elif action == "LANE_LEFT":
+                _from, _to, _id = self.target_lane_index
+                target_lane_index = (
+                    _from,
+                    _to,
+                    np.clip(_id - 1, 0, len(self.road.network.graph[_from][_to]) - 1),
+                )
+                if self.road.network.get_lane(target_lane_index).is_reachable_from(self.position):
+                    self.target_lane_index = target_lane_index
+
+            # Compute steering and acceleration for discrete actions
+            action = {
+                "steering": self.steering_control(self.target_lane_index),
+                "acceleration": self.speed_control(self.target_speed),
+            }
+
+        elif isinstance(action, dict) and "steering" in action and "acceleration" in action:
+            # Handle continuous actions
+            action["steering"] = np.clip(
+                action["steering"], -self.MAX_STEERING_ANGLE, self.MAX_STEERING_ANGLE
+            )
+            action["acceleration"] = np.clip(action["acceleration"], -1, 1)
+
         super().act(action)
 
     def follow_road(self) -> None:
@@ -299,20 +305,25 @@ class MDPVehicle(ControlledVehicle):
         - If the action is a speed change, choose speed from the allowed discrete range.
         - Else, forward action to the ControlledVehicle handler.
 
-        :param action: a high-level action
+        :param action: a high-level action or a continuous action (dict)
         """
-        if action == "FASTER":
-            self.speed_index = self.speed_to_index(self.speed) + 1
-        elif action == "SLOWER":
-            self.speed_index = self.speed_to_index(self.speed) - 1
-        else:
+        if isinstance(action, str):
+            if action == "FASTER":
+                self.speed_index = self.speed_to_index(self.speed) + 1
+            elif action == "SLOWER":
+                self.speed_index = self.speed_to_index(self.speed) - 1
+            else:
+                super().act(action)
+                return
+
+            self.speed_index = int(
+                np.clip(self.speed_index, 0, self.target_speeds.size - 1)
+            )
+            self.target_speed = self.index_to_speed(self.speed_index)
+            super().act()
+        elif isinstance(action, dict):
+            # Forward to the continuous action handling of ControlledVehicle
             super().act(action)
-            return
-        self.speed_index = int(
-            np.clip(self.speed_index, 0, self.target_speeds.size - 1)
-        )
-        self.target_speed = self.index_to_speed(self.speed_index)
-        super().act()
 
     def index_to_speed(self, index: int) -> float:
         """
