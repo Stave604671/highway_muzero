@@ -41,11 +41,13 @@ class ControlledVehicle(Vehicle):
         target_lane_index: LaneIndex = None,
         target_speed: float = None,
         route: Route = None,
+        is_observed: bool = False,
     ):
         super().__init__(road, position, heading, speed)
         self.target_lane_index = target_lane_index or self.lane_index
         self.target_speed = target_speed or self.speed
         self.route = route
+        self.is_observed = is_observed
 
     @classmethod
     def create_from(cls, vehicle: "ControlledVehicle") -> "ControlledVehicle":
@@ -131,11 +133,33 @@ class ControlledVehicle(Vehicle):
 
         elif isinstance(action, dict) and "steering" in action and "acceleration" in action:
             # Handle continuous actions
+            if action.get("steering")>0:
+                _from, _to, _id = self.target_lane_index
+                target_lane_index = (
+                    _from,
+                    _to,
+                    np.clip(_id - 1, 0, len(self.road.network.graph[_from][_to]) - 1),
+                )
+                if self.road.network.get_lane(target_lane_index).is_reachable_from(self.position):
+                    self.target_lane_index = target_lane_index
+            elif action.get('steering')<0:
+                _from, _to, _id = self.target_lane_index
+                target_lane_index = (
+                    _from,
+                    _to,
+                    np.clip(_id + 1, 0, len(self.road.network.graph[_from][_to]) - 1),
+                )
+                if self.road.network.get_lane(target_lane_index).is_reachable_from(self.position):
+                    self.target_lane_index = target_lane_index
             action["steering"] = np.clip(
-                action["steering"], -self.MAX_STEERING_ANGLE, self.MAX_STEERING_ANGLE
+                action.get("steering", self.steering_control(self.target_lane_index)),
+                -self.MAX_STEERING_ANGLE, self.MAX_STEERING_ANGLE
             )
-            action["acceleration"] = np.clip(action["acceleration"], -1, 1)
-
+            # Use speed control for acceleration based on target speed
+            action["acceleration"] = np.clip(
+                action.get("acceleration", self.speed_control(self.target_speed)),
+                -1, 1
+            )
         super().act(action)
 
     def follow_road(self) -> None:
@@ -274,6 +298,7 @@ class MDPVehicle(ControlledVehicle):
         target_speed: Optional[float] = None,
         target_speeds: Optional[Vector] = None,
         route: Optional[Route] = None,
+        is_observed: bool = False,
     ) -> None:
         """
         Initializes an MDPVehicle
@@ -297,6 +322,7 @@ class MDPVehicle(ControlledVehicle):
         )
         self.speed_index = self.speed_to_index(self.target_speed)
         self.target_speed = self.index_to_speed(self.speed_index)
+        self.is_observed = is_observed
 
     def act(self, action: Union[dict, str] = None) -> None:
         """

@@ -127,32 +127,56 @@ class TimeToCollisionObservation(ObservationType):
 
     def observe(self) -> np.ndarray:
         if not self.env.road:
-            num_lanes = min(3, len(self.env.road.network.all_side_lanes(self.observer_vehicle.lane_index)))  # 动态获取车道数
-            num_speeds = min(3, len(self.observer_vehicle.target_speeds))  # 动态获取速度维度
+            num_lanes = min(4, len(self.env.road.network.all_side_lanes(self.observer_vehicle.lane_index)))  # 动态获取车道数，但不超过4个车道
+            num_speeds = min(5, len(self.observer_vehicle.target_speeds))  # 动态获取速度维度
             return np.zeros(
                 (num_speeds, num_lanes, int(self.horizon * self.env.config["policy_frequency"]))
             )
+
+        # 计算 Time-to-Collision (TTC) 网格
         grid = compute_ttc_grid(
             self.env,
             vehicle=self.observer_vehicle,
             time_quantization=1 / self.env.config["policy_frequency"],
             horizon=self.horizon,
         )
-        # Padding 应根据网格形状进行适配
-        padding = np.ones(np.shape(grid))
+
+        # 计算网格维度
+        grid_shape = np.shape(grid)
+        padding = np.ones(grid_shape)
+
+        # 在车道方向上进行填充，保证足够的车道范围
         padded_grid = np.concatenate([padding, grid, padding], axis=1)
-        obs_lanes = min(len(self.env.road.network.all_side_lanes(self.observer_vehicle.lane_index)), grid.shape[1])
-        l0 = max(0, self.observer_vehicle.lane_index[2] - obs_lanes // 2)
-        lf = min(grid.shape[1] , self.observer_vehicle.lane_index[2] + obs_lanes // 2)
-        clamped_grid = padded_grid[:, l0 : lf + 1, :]
-        repeats = np.ones(clamped_grid.shape[0])
-        repeats[np.array([0, -1])] += clamped_grid.shape[0]
-        padded_grid = np.repeat(clamped_grid, repeats.astype(int), axis=0)
-        obs_speeds = grid.shape[0]  # 动态获取速度维度
-        v0 = max(0, self.observer_vehicle.speed_index - obs_speeds // 2)
-        vf = min(grid.shape[0] - 1, self.observer_vehicle.speed_index + obs_speeds // 2)
-        clamped_grid = padded_grid[v0 : vf + 1, :, :]
-        # ray.logger.info(f"{clamped_grid.shape}")
+
+        # 动态获取观察的车道范围，确保裁剪后维度不会超出边界
+        obs_lanes = min(4, len(self.env.road.network.all_side_lanes(self.observer_vehicle.lane_index)),
+                        grid.shape[1])  # 限制车道数量不超过4
+        l0 = grid.shape[1] + self.observer_vehicle.lane_index[2] - obs_lanes // 2
+        lf = grid.shape[1] + self.observer_vehicle.lane_index[2] + obs_lanes // 2
+
+        # 裁剪车道部分，确保最终车道数为4
+        clamped_grid = padded_grid[:, l0: lf, :]  # 使用 l0 到 lf 确保车道数不超过 4
+
+        if clamped_grid.shape[1] != 4:  # 如果车道数不足4，进行适当的填充
+            pad_left = (4 - clamped_grid.shape[1]) // 2
+            pad_right = 4 - clamped_grid.shape[1] - pad_left
+            clamped_grid = np.pad(clamped_grid, ((0, 0), (pad_left, pad_right), (0, 0)), 'constant')
+
+        # 动态获取速度范围
+        obs_speeds = grid.shape[0]
+        v0 = grid.shape[0] + self.observer_vehicle.speed_index - obs_speeds // 2
+        vf = grid.shape[0] + self.observer_vehicle.speed_index + obs_speeds // 2
+
+        # 裁剪速度部分
+        clamped_grid = clamped_grid[v0: vf + 1, :, :]
+
+        # 确保裁剪后的速度维度与原始grid一致，使用填充保证对称性
+        if clamped_grid.shape[0] < grid.shape[0]:
+            pad_top = (grid.shape[0] - clamped_grid.shape[0]) // 2
+            pad_bottom = grid.shape[0] - clamped_grid.shape[0] - pad_top
+            clamped_grid = np.pad(clamped_grid, ((pad_top, pad_bottom), (0, 0), (0, 0)), 'constant')
+
+        # 最终返回的clamped_grid需要与原始grid的维度保持一致
         return clamped_grid.astype(np.float32)
 
 

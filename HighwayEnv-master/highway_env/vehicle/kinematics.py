@@ -217,8 +217,8 @@ class Vehicle(RoadObject):
 
         # 处理换道逻辑
         new_lane_index = self.road.network.get_closest_lane_index(self.position, self.heading)
-        if self.is_observed:
-            logger.info(f"当前车道：{self.lane_index[2]}。当前位置：{self.position[1]} 换道目标车道：{new_lane_index[2]}.")
+        # if self.is_observed:
+        #     logger.info(f"当前车道：{self.lane_index[2]}。当前位置：{self.position[1]} 换道目标车道：{new_lane_index[2]}.")
         if new_lane_index[2] != self.lane_index[2]:
             # 计算新车道中心位置，假设车道宽度为4
             """
