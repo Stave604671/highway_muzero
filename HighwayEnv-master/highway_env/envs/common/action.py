@@ -84,7 +84,7 @@ class ContinuousAction(ActionType):
 
     STEERING_RANGE = (-np.pi / 4, np.pi / 4)
     """Steering angle range: [-x, x], in rad."""
-    DEFAULT_TARGET_SPEEDS = np.array([20, 22, 24, 26, 28, 30])  # 增加默认的目标速度集
+    DEFAULT_TARGET_SPEEDS = np.linspace(20, 30, 5)  # 增加默认的目标速度集
 
     def __init__(
         self,
