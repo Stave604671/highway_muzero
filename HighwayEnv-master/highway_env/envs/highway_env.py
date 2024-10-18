@@ -69,31 +69,36 @@ class HighwayEnv(AbstractEnv):
 
     def _create_vehicles(self) -> None:
         """Create some new random vehicles of a given type, and add them on the road."""
+        # 获取非观测车辆用哪个类初始化
         other_vehicles_type = utils.class_from_path(self.config["other_vehicles_type"])
+        # 获取控制的观测车辆有几个
         other_per_controlled = near_split(
-            self.config["vehicles_count"], num_bins=self.config["controlled_vehicles"]
-        )
-
+            self.config["vehicles_count"], num_bins=self.config["controlled_vehicles"])
+        # 记录控制的观测车辆
         self.controlled_vehicles = []
         for others in other_per_controlled:
-            vehicle = MDPVehicle.create_random(
+            # 观测车辆初始化
+            vehicle = Vehicle.create_random(
                 self.road,
                 lane_id=self.config["initial_lane_id"],
                 speed=25,
                 spacing=self.config["ego_spacing"],
-                is_observed=True,
-            )
+                is_observed=True)
+            # 观测车辆属性初始化
             vehicle = self.action_type.vehicle_class(
-                self.road, vehicle.position, vehicle.heading, vehicle.speed, is_observed=True
-            )
+                self.road, vehicle.position, vehicle.heading, vehicle.speed, is_observed=True)
+            # 记录受控制的观测车辆
             self.controlled_vehicles.append(vehicle)
+            # 将观测车辆放入道路
             self.road.vehicles.append(vehicle)
-
+            # 处理其余的非观测车辆
             for _ in range(others):
+                # 非观测车辆初始化
                 vehicle = other_vehicles_type.create_random(
-                    self.road, spacing=1 / self.config["vehicles_density"], is_observed=False
-                )
+                    self.road, spacing=1 / self.config["vehicles_density"], is_observed=False)
+                # 非观测车辆行为控制
                 vehicle.randomize_behavior()
+                # 非观测车辆放入道路
                 self.road.vehicles.append(vehicle)
 
     def _reward(self, action: Action) -> float:
