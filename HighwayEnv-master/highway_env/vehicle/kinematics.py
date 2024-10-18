@@ -68,6 +68,7 @@ class Vehicle(RoadObject):
         **kwargs
     ):
         super().__init__(road, position, heading, speed)
+        self.is_changing_lane = None
         self.prediction_type = predition_type
         self.action = {"steering": 0, "acceleration": 0}
         self.crashed = False
@@ -219,6 +220,7 @@ class Vehicle(RoadObject):
                 if max(front_positions_x) - min(front_positions_x) < 5:  # 如果前后位置差异小于5，认为它们并排行驶
                     chosen_vehicle = np.random.choice(front_vehicles)
                     chosen_vehicle.speed += 5.0  # 加速选中的车辆
+            self.action["steering"] = 0
         # 限制动作范围
         self.clip_actions()
         self.heading += self.action["steering"] * dt
@@ -229,26 +231,32 @@ class Vehicle(RoadObject):
             self.position += self.impact
             self.crashed = True
             self.impact = None
-        # 处理换道逻辑
+        # 更新车辆的朝向
+        if not hasattr(self, 'is_changing_lane'):
+            self.is_changing_lane = False
+            self.target_lane_center_y = None
         new_lane_index = self.road.network.get_closest_lane_index(self.position, self.heading)
-        if new_lane_index[2] != self.lane_index[2]:
-            # 计算新车道中心位置，车道宽度为4
-            """
-            -----------------------------------
-            --1     1车道中心坐标=0
-            -----------------------------------
-            --2     2车道中心坐标=4
-            -----------------------------------
-            --3     3车道中心坐标=8
-            -----------------------------------
-            --4     4车道中心坐标=12
-            -----------------------------------
-            """
-            target_lane_center_y = (new_lane_index[2] + 0.5) * 4 - 2  # 车道宽度为4
-            self.position[1] = target_lane_center_y  # 移动车辆到新车道的中心位置
+        # 开始新的换道过程
+        if new_lane_index[2] != self.lane_index[2] and not self.is_changing_lane:
+            self.target_lane_center_y = (new_lane_index[2] + 0.5) * 4 - 2  # 车道宽度为4
+            self.target_heading = self.lane.heading_at(self.position[0])  # 获取目标车道的朝向
+            self.is_changing_lane = True  # 标记正在换道
             self.lane_index = new_lane_index
             self.lane = self.road.network.get_lane(self.lane_index)
-        # 更新速度
+        # 如果正在换道，逐步调整位置和车头方向
+        if self.is_changing_lane:
+            # 平滑移动车辆的Y坐标
+            delta_y = (self.target_lane_center_y - self.position[1]) * 0.4  # 小步移动
+            self.position[1] += delta_y
+            # 平滑调整车辆的车头朝向
+            delta_heading = (self.target_heading - self.heading) * 0.4  # 小步调整车头
+            self.heading += delta_heading
+            # 当y坐标接近目标车道中心时，结束换道过程
+            if abs(self.position[1] - self.target_lane_center_y) < 0.1 and abs(
+                    self.heading - self.target_heading) < 0.1:
+                self.position[1] = self.target_lane_center_y
+                self.heading = self.target_heading
+                self.is_changing_lane = False  # 换道完成
         self.speed += self.action["acceleration"] * dt
 
         # 调用状态更新
