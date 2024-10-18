@@ -186,58 +186,68 @@ class Vehicle(RoadObject):
             if obstacles:
                 closest_obstacle = min(obstacles, key=lambda obs: np.linalg.norm(obs.position - self.position))
                 direction_to_obstacle = closest_obstacle.position - self.position
-                target_heading = np.arctan2(direction_to_obstacle[1], direction_to_obstacle[0]) + np.pi/2
-                # print(f"{self.lane_index[2]}--{type(self.lane_index[2])}--{target_heading}--{type(target_heading)}")
-                if self.lane_index[2] == 0:
-                    if target_heading < 0:  # 避免向左转，保持直行或向右
-                        target_heading = -target_heading
-                elif self.lane_index[2] == 3:
-                    if target_heading > 0:  # 避免向左转，保持直行或向右
-                        target_heading = -target_heading
-                # print(f"1、看看有没有正确进if{self.action['steering']}：观测车辆车道{self.lane_index[2]}")
+                target_heading = np.arctan2(direction_to_obstacle[1], direction_to_obstacle[0]) + np.pi / 2
+                if self.lane_index[2] == 0 and target_heading < 0:  # 避免向左转，保持直行或向右
+                    target_heading = -target_heading
+                elif self.lane_index[2] == 3 and target_heading > 0:  # 避免向右转，保持直行或向左
+                    target_heading = -target_heading
                 self.action["steering"] = self.pid_controller.update(target_heading, self.heading, dt)
-                # print("2、看看有没有正确进if：", self.action["steering"])
             else:
                 self.action["steering"] = 0  # 无障碍物时，保持直线行驶
         else:
-            self.action["steering"] = 0  # 非观察车辆时，保持直线行驶
-
+            # 检查四辆非观测车辆并排的情况
+            non_observed_vehicles = [v for v in self.road.vehicles if not v.is_observed]
+            lane_vehicles = {0: [], 1: [], 2: [], 3: []}  # 初始化每个车道的车辆
+            for v in non_observed_vehicles:
+                vehicle_y = v.position[1]
+                if -2 < vehicle_y < 2:  # 第0车道
+                    lane_vehicles[0].append(v)
+                elif 2 < vehicle_y < 6:  # 第1车道
+                    lane_vehicles[1].append(v)
+                elif 6 < vehicle_y < 10:  # 第2车道
+                    lane_vehicles[2].append(v)
+                elif 10 < vehicle_y < 14:  # 第3车道
+                    lane_vehicles[3].append(v)
+            front_vehicles = []
+            for lane, vehicles in lane_vehicles.items():
+                if vehicles:
+                    front_vehicle = max(vehicles, key=lambda v: v.position[0])
+                    front_vehicles.append(front_vehicle)
+            # 检查是否四个车道上都有车辆，并且这些最靠前的车辆并排行驶 (即 position[0] 非常接近)
+            if len(front_vehicles) == 4:  # 确保每个车道都有最靠前的车辆
+                front_positions_x = [v.position[0] for v in front_vehicles]
+                if max(front_positions_x) - min(front_positions_x) < 5:  # 如果前后位置差异小于5，认为它们并排行驶
+                    chosen_vehicle = np.random.choice(front_vehicles)
+                    chosen_vehicle.speed += 5.0  # 加速选中的车辆
+        # 限制动作范围
         self.clip_actions()
-        delta_f = self.action["steering"]  # 使用 PID 控制的 steering
-        beta = np.arctan(1 / 2 * np.tan(delta_f))  # 侧滑角
         self.heading += self.action["steering"] * dt
         v = self.speed * np.array([np.cos(self.heading), np.sin(self.heading)])
         self.position += v * dt
-
         # 碰撞检测
         if self.impact is not None:
             self.position += self.impact
             self.crashed = True
             self.impact = None
-
         # 处理换道逻辑
         new_lane_index = self.road.network.get_closest_lane_index(self.position, self.heading)
-        # if self.is_observed:
-        #     logger.info(f"当前车道：{self.lane_index[2]}。当前位置：{self.position[1]} 换道目标车道：{new_lane_index[2]}.")
         if new_lane_index[2] != self.lane_index[2]:
-            # 计算新车道中心位置，假设车道宽度为4
+            # 计算新车道中心位置，车道宽度为4
             """
-            0
-            --1     1车道中心坐标=（0+0.5）*4=0.5*4=2
-            4
-            --2     2车道中心坐标=（1+0.5）*4=1.5*4=6
-            8
-            --3     3车道中心坐标=（2+0.5）*4=2.5*4-2=10-2 = 8
-            12
-            --4     4车道中心坐标=（3+0.5）*4-2=3.5*4-2=14-2=12
-            16
+            -----------------------------------
+            --1     1车道中心坐标=0
+            -----------------------------------
+            --2     2车道中心坐标=4
+            -----------------------------------
+            --3     3车道中心坐标=8
+            -----------------------------------
+            --4     4车道中心坐标=12
+            -----------------------------------
             """
             target_lane_center_y = (new_lane_index[2] + 0.5) * 4 - 2  # 车道宽度为4
             self.position[1] = target_lane_center_y  # 移动车辆到新车道的中心位置
             self.lane_index = new_lane_index
             self.lane = self.road.network.get_lane(self.lane_index)
-            self.heading = self.lane.heading_at(self.position[0])  # 将航向调整为车道的方向
-            logger.info(f"{self.position[1]}--{target_lane_center_y}--{self.lane_index}")
         # 更新速度
         self.speed += self.action["acceleration"] * dt
 
