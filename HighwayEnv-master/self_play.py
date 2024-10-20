@@ -173,7 +173,7 @@ class SelfPlay:
                     self.game.render()
 
                 game_history.store_search_statistics(root)
-
+                game_history.vehicle_history.append(self.game.env.unwrapped.road.vehicles)
                 # Next batch
                 game_history.action_history.append(action.value)
                 game_history.observation_history.append(observation)
@@ -514,6 +514,7 @@ class GameHistory:
         self.child_actions = []
         self.child_visits = []
         self.root_values = []
+        self.vehicle_history = []
         self.reanalysed_predicted_root_values = None
         # For PER
         self.priorities = None
