@@ -81,7 +81,6 @@ class HighwayEnv(AbstractEnv):
             vehicle = Vehicle.create_random(
                 self.road,
                 lane_id=self.config["initial_lane_id"],
-                speed=25,
                 spacing=self.config["ego_spacing"],
                 is_observed=True)
             # 观测车辆属性初始化
@@ -117,7 +116,7 @@ class HighwayEnv(AbstractEnv):
             reward = utils.lmap(
                 reward,
                 [self.config['collision_reward'] + self.config["lane_change_reward"] - 1,
-                 self.config['collision_reward'] + 1 + self.config["safe_distance_reward"]],  # reward 的最小值和最大值
+                 self.config['not_collision_reward'] + 1 + self.config["safe_distance_reward"]],  # reward 的最小值和最大值
                 [0, 1],
             )
         # reward *= rewards["on_road_reward"]
