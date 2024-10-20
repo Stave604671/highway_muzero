@@ -26,8 +26,8 @@ class MuZeroConfig:
         self.opponent = None  # MuZero 面对的对手，用于评估在多人游戏中的进展。可以是 "random" 或 "expert"，如果在游戏类中实现了对手
 
         # Self-Play
-        self.num_workers = 1  # 定义了同时进行 Self-Play 的工作线程数量，这些线程负责生成训练样本并将其存储到回放缓冲区中。
-        self.selfplay_on_gpu = True  # 是否在gpu进行自我博弈,打开后速度变快,但是显存开支会高很多
+        self.num_workers = 12  # 定义了同时进行 Self-Play 的工作线程数量，这些线程负责生成训练样本并将其存储到回放缓冲区中。
+        self.selfplay_on_gpu = False  # 是否在gpu进行自我博弈,打开后速度变快,但是显存开支会高很多
         self.max_moves = 1000  # 每场游戏的最大游戏次数,未发生碰撞,或者没有达到这个次数,单场游戏都不停止
         self.num_simulations = 50  # 执行指定次数的模拟，每次模拟从根节点开始进行搜索和更新,
         self.discount = 0.997  # 长期回报的折扣因子
@@ -92,7 +92,7 @@ class MuZeroConfig:
 
         # Reanalyze (See paper appendix Reanalyse)
         self.use_last_model_value = True  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
-        self.reanalyse_on_gpu = True   # windows下需要都打开，linux没限制
+        self.reanalyse_on_gpu = False   # windows下需要都打开，linux没限制
 
         ### Adjust the self play / training ratio to avoid over/underfitting
         self.self_play_delay = 1/100  # Number of seconds to wait after each played game
