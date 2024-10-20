@@ -5,7 +5,7 @@ import time
 import numpy
 import ray
 import torch
-
+import copy
 import models
 
 
@@ -173,7 +173,7 @@ class SelfPlay:
                     self.game.render()
 
                 game_history.store_search_statistics(root)
-                game_history.vehicle_history.append(self.game.env.unwrapped.road.vehicles)
+                game_history.vehicle_history.append(copy.deepcopy(self.game.env.unwrapped.road.vehicles))
                 # Next batch
                 game_history.action_history.append(action.value)
                 game_history.observation_history.append(observation)
