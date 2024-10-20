@@ -8,7 +8,7 @@ from ray import logger
 import highway_env   # 不加这个的话会进不了环境
 from .abstract_game import AbstractGame
 
-
+#最新版本
 class MuZeroConfig:
     def __init__(self):
         # fmt: off
