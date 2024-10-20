@@ -156,11 +156,11 @@ class SelfPlay:
                         else 0,
                     )
 
-                    if render:
-                        print(f'Tree depth: {mcts_info["max_tree_depth"]}')
-                        print(
-                            f"Root value for player {self.game.to_play()}: {root.value():.2f}"
-                        )
+                    # if render:
+                    #     print(f'Tree depth: {mcts_info["max_tree_depth"]}')
+                    #     print(
+                    #         f"Root value for player {self.game.to_play()}: {root.value():.2f}"
+                    #     )
                 else:
                     action, root = self.select_opponent_action(
                         opponent, stacked_observations
@@ -169,7 +169,7 @@ class SelfPlay:
                 observation, reward, done = self.game.step(action.value)
 
                 if render:
-                    print(f"Played action: {self.game.action_to_string(action)}")
+                    # print(f"Played action: {self.game.action_to_string(action)}")
                     self.game.render()
 
                 game_history.store_search_statistics(root)
