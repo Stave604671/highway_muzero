@@ -8,7 +8,7 @@ from ray import logger
 import highway_env   # 不加这个的话会进不了环境
 from .abstract_game import AbstractGame
 
-#最新版本
+
 class MuZeroConfig:
     def __init__(self):
         # fmt: off
@@ -162,8 +162,10 @@ class Game(AbstractGame):
                                 'duration': 30,  # 限制了仿真的时间长度
                                 'ego_spacing': 1.5,  # 表示控制车辆（ego vehicle）与前一辆车之间的初始间隔距离。它用来设置在创建控制车辆时的车间距
                                 'vehicles_density': 1,
-                                'collision_reward': -2.5,  # 与车辆相撞时获取的惩罚
-                                'lane_change_reward': -0.5,
+                                "right_lane_reward": 0.2,  # 在最右边的车道上行驶时获得的奖励，在其他车道上线性映射为零。
+                                'collision_reward': -1.5,  # 与车辆相撞时获取的惩罚
+                                'high_speed_reward': 3,    # 维持高速行驶的奖励
+                                'lane_change_reward': -0.2,  # 换道的惩罚
                                 'reward_speed_range': [20, 30],  # 高速的奖励从这个范围线性映射到[0,HighwayEnv.HIGH_SPEED_REWARD]。
                                 'offroad_terminal': True  # 车辆偏离道路是否会导致仿真结束
                             })

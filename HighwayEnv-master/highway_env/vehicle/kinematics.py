@@ -160,32 +160,20 @@ class Vehicle(RoadObject):
             self.action = action
 
     def get_nearby_obstacles(self, distance_threshold: float = LENGTH) -> list[RoadObject]:
-        dis = []#加入所有车道车辆对于观测车的距离
         nearby_obstacles = []#将当前车辆的位置 self.position 转换为一个 NumPy 数组，确保后续可以进行矢量运算。self.position 应该是当前车辆在道路上的二维坐标。
         # 观测车辆的坐标
         self_pos = np.array(self.position)  # 确保是 numpy 数组
         for obj_id, obj in enumerate(self.road.vehicles):  # 假设车辆也算作障碍物，这个循环遍历 self.road.vehicles 中的所有车辆。self.road 表示当前车辆所在的道路，self.road.vehicles 是该道路上所有车辆的列表。
-            # 如果是非观测车辆[1-20],自己车id=0
+            # 如果是非观测车辆
             if not obj.is_observed:
                 # 获取非观测车辆的坐标
                 obj_pos = np.array(obj.position)  # 确保是 numpy 数组
                 # 计算记录
                 distance = np.linalg.norm(obj_pos - self_pos)
-                dis.append(distance)
-
                 # 这里不能简单给10，如果是以像素为单位，直线上建议把这个距离给一个车的长度，考虑到变道后隔壁车道也有车，应该在求一个三角形斜边（有兴趣你自己加）
                 # print(f"观测车辆车道{self.lane_index[2]}-要避障的车辆的车道-{obj.lane_index[2]}")
-                # if len(dis)<3:
-                #     if distance < distance_threshold * 2.5 and self.lane_index[2] == obj.lane_index[2]:
-                #         nearby_obstacles.append(obj)
-                #         print("lalalalalala")
-                # else:
-                dis = sorted(dis)
-                if (distance < distance_threshold*2.5 and self.lane_index[2] == obj.lane_index[2]) and not (distance < dis[0] and distance < dis[1] and distance < dis[2]):
+                if distance < distance_threshold*2.5 and self.lane_index[2] == obj.lane_index[2]:
                     nearby_obstacles.append(obj)
-                else:
-                    nearby_obstacles = nearby_obstacles
-
         return nearby_obstacles
 
     def step(self, dt: float) -> None:
@@ -251,7 +239,6 @@ class Vehicle(RoadObject):
             self.lane = self.road.network.get_lane(self.lane_index)
             self.heading = self.lane.heading_at(self.position[0])  # 将航向调整为车道的方向
             logger.info(f"{self.position[1]}--{target_lane_center_y}--{self.lane_index}")
-            self.speed+=-4
         # 更新速度
         self.speed += self.action["acceleration"] * dt
 
