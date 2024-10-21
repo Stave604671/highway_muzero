@@ -75,6 +75,9 @@ class Vehicle(RoadObject):
         self.impact = None
         self.log = []
         self.history = deque(maxlen=self.HISTORY_SIZE)
+        self.acceleration = 0.0
+        self.previous_acceleration = 0.0  # 前一时刻的加速度
+        self.jerk = 0.0  # 当前加加速度
         self.pid_controller = pid_controller if pid_controller else PIDController(3, 0.05, 0.2)  # 默认 PID 参数
 
     @classmethod
@@ -241,9 +244,26 @@ class Vehicle(RoadObject):
             logger.info(f"{self.position[1]}--{target_lane_center_y}--{self.lane_index}")
         # 更新速度
         self.speed += self.action["acceleration"] * dt
-
+        self.acceleration = self.action["acceleration"]
+        self.jerk = (self.acceleration - self.previous_acceleration) / dt
+        self.previous_acceleration = self.acceleration
         # 调用状态更新
         self.on_state_update()
+
+    @property
+    def get_jerk(self) -> float:
+        """返回当前的加加速度"""
+        return self.jerk
+
+    @property
+    def get_verb_x(self) -> float:
+        """获取规划此刻的横向速度"""
+        return self.velocity[0]
+
+    @property
+    def get_verb_y(self) -> float:
+        """获取此刻的纵向速度"""
+        return self.velocity[1]
 
     def clip_actions(self) -> None:
         if self.crashed:
