@@ -75,7 +75,7 @@ class Vehicle(RoadObject):
         self.impact = None
         self.log = []
         self.history = deque(maxlen=self.HISTORY_SIZE)
-        self.acceleration = 0.0
+        self.acceleration1 = 0.0
         self.previous_acceleration = 0.0  # 前一时刻的加速度
         self.jerk = 0.0  # 当前加加速度
         self.pid_controller = pid_controller if pid_controller else PIDController(3, 0.05, 0.2)  # 默认 PID 参数
@@ -244,9 +244,9 @@ class Vehicle(RoadObject):
             logger.info(f"{self.position[1]}--{target_lane_center_y}--{self.lane_index}")
         # 更新速度
         self.speed += self.action["acceleration"] * dt
-        self.acceleration = self.action["acceleration"]
-        self.jerk = (self.acceleration - self.previous_acceleration) / dt
-        self.previous_acceleration = self.acceleration
+        self.acceleration1 = self.action["acceleration"]
+        self.jerk = (self.acceleration1 - self.previous_acceleration) / dt
+        self.previous_acceleration = self.acceleration1
         # 调用状态更新
         self.on_state_update()
 
