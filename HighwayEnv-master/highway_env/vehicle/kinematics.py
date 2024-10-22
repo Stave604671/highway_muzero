@@ -197,7 +197,7 @@ class Vehicle(RoadObject):
         """
 
         if self.is_observed:
-            logger.info(f"观测车辆当前车速：{self.speed}")
+            # logger.info(f"观测车辆当前车速：{self.speed}")
             obstacles = self.get_nearby_obstacles()  # 获取障碍物
             if obstacles:
                 closest_obstacle = min(obstacles, key=lambda obs: np.linalg.norm(obs.position - self.position))
@@ -233,8 +233,8 @@ class Vehicle(RoadObject):
 
         # 处理换道逻辑
         new_lane_index = self.road.network.get_closest_lane_index(self.position, self.heading)
-        if self.is_observed:
-            logger.info(f"当前车道：{self.lane_index[2]}。当前位置：{self.position[1]} 换道目标车道：{new_lane_index[2]}.")
+        # if self.is_observed:
+        #     logger.info(f"当前车道：{self.lane_index[2]}。当前位置：{self.position[1]} 换道目标车道：{new_lane_index[2]}.")
         if new_lane_index[2] != self.lane_index[2]:
             # 计算新车道中心位置，假设车道宽度为4
             """
@@ -253,7 +253,7 @@ class Vehicle(RoadObject):
             self.lane_index = new_lane_index
             self.lane = self.road.network.get_lane(self.lane_index)
             self.heading = self.lane.heading_at(self.position[0])  # 将航向调整为车道的方向
-            logger.info(f"{self.position[1]}--{target_lane_center_y}--{self.lane_index}")
+            # logger.info(f"{self.position[1]}--{target_lane_center_y}--{self.lane_index}")
         # 更新速度
         smoothing_factor = 0.01  # 调整平滑因子，值越小，平滑效果越明显
         self.action["acceleration"] = smoothing_factor * self.action["acceleration"] + (
