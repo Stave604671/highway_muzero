@@ -662,7 +662,7 @@ if __name__ == "__main__":
                 load_model_menu(muzero, game_name)
             elif choice == 2:
                 out = muzero.test(render=True, opponent="self", muzero_player=None)
-                with open("test_history2.pkl", "wb") as f:
+                with open("test_history_sim30.pkl", "wb") as f:
                     pickle.dump(out[0], f)
             elif choice == 3:
                 muzero.test(render=True, opponent="human", muzero_player=0)

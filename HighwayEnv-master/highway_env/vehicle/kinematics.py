@@ -68,6 +68,10 @@ class Vehicle(RoadObject):
         is_observed: bool = False
     ):
         super().__init__(road, position, heading, speed)
+        self.jerk_y = None
+        self.jerk_x = None
+        self.previous_acceleration_y = None
+        self.previous_acceleration_x = None
         self.prediction_type = predition_type
         self.action = {"steering": 0, "acceleration": 0}
         self.crashed = False
@@ -244,16 +248,33 @@ class Vehicle(RoadObject):
             logger.info(f"{self.position[1]}--{target_lane_center_y}--{self.lane_index}")
         # 更新速度
         self.speed += self.action["acceleration"] * dt
-        self.acceleration1 = self.action["acceleration"]
-        self.jerk = (self.acceleration1 - self.previous_acceleration) / dt
-        self.previous_acceleration = self.acceleration1
+        # 计算当前时刻的横向和纵向加速度
+        current_acceleration_x = self.action["acceleration"] * np.cos(self.heading)
+        current_acceleration_y = self.action["acceleration"] * np.sin(self.heading)
+
+        # 计算横向和纵向加加速度（jerk），jerk = 加速度的变化 / 时间差
+        jerk_x = (current_acceleration_x - self.previous_acceleration_x) / dt
+        jerk_y = (current_acceleration_y - self.previous_acceleration_y) / dt
+
+        # 更新前一时刻的加速度值
+        self.previous_acceleration_x = current_acceleration_x
+        self.previous_acceleration_y = current_acceleration_y
+
+        # 输出当前横向和纵向的加加速度
+        self.jerk_x = jerk_x
+        self.jerk_y = jerk_y
         # 调用状态更新
         self.on_state_update()
 
     @property
-    def get_jerk(self) -> float:
+    def get_jerk_x(self) -> float:
         """返回当前的加加速度"""
-        return self.jerk
+        return self.jerk_x
+
+    @property
+    def get_jerk_y(self) -> float:
+        """返回当前的加加速度"""
+        return self.jerk_y
 
     @property
     def get_verb_x(self) -> float:
