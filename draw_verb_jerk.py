@@ -129,13 +129,16 @@ def get_vehicle_state_in_game_history(game_history, time_range, vehicle_tag, veh
                                                 "y": [vehicle.position[1]],
                                                 "vx": [vehicle.get_verb_x],
                                                 "vy": [vehicle.get_verb_y],
-                                                "jerk": [vehicle.get_jerk]}
+                                                "jerk_x": [vehicle.get_jerk_x],
+                                                "jerk_y": [vehicle.get_jerk_y]}
+
         else:
             vehicle_collect_dict[vehicle_id]['x'].append(vehicle.position[0])
             vehicle_collect_dict[vehicle_id]['y'].append(vehicle.position[1])
             vehicle_collect_dict[vehicle_id]['vx'].append(vehicle.get_verb_x)
             vehicle_collect_dict[vehicle_id]['vy'].append(vehicle.get_verb_y)
-            vehicle_collect_dict[vehicle_id]['jerk'].append(vehicle.get_jerk)
+            vehicle_collect_dict[vehicle_id]['jerk_x'].append(vehicle.get_jerk_x)
+            vehicle_collect_dict[vehicle_id]['jerk_y'].append(vehicle.get_jerk_y)
     return vehicle_collect_dict
 
 
