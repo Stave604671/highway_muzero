@@ -148,7 +148,7 @@ if __name__ == '__main__':
     vehicle_collect_dict = {}
     for file in os.listdir(history_pickle_path):
         pickle_file = os.path.join(history_pickle_path, file)
-        legend_name = file.replace(".pkl", "").split("_")[2]
+        legend_name = file.replace(".pkl", "").replace("test_history_", "")
         with open(pickle_file, "rb") as f:
             game_history_ = pickle.load(f)
         error_time_range = get_observed_vehicle_road_change(game_history_)
