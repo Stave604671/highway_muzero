@@ -12,7 +12,7 @@ from .abstract_game import AbstractGame
 class MuZeroConfig:
     def __init__(self):
         # fmt: off
-        self.seed = 10  # 随机数种子,用于固定随机性方便复现
+        self.seed = 0  # 随机数种子,用于固定随机性方便复现
         self.max_num_gpus = None  # 固定使用gpu的最大数量.使用单个gpu会更快,没有配置的话会默认使用所有gpu
 
         # Game

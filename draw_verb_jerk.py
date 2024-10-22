@@ -101,13 +101,15 @@ def draw_verb_jerk_vy_table(tag_data, xlabel='Time(s)', ylabel="X-speed(m/s)", c
     xlabels[0] = "0.0"
     # 设置y轴刻度
     if "v" in choice_flag:
-        y_ticks = np.arange(0, 30, 2)
-    elif "jerk" in choice_flag:
         y_min, y_max = ax.get_ylim()
         y_ticks = np.arange(round(y_min), round(y_max), round((y_max-y_min)/10))
+        # y_ticks = np.arange(-30, 30, 2)
+    elif "jerk" in choice_flag:
+        y_min, y_max = ax.get_ylim()
+        y_ticks = np.arange(round(y_min), round(y_max), (y_max-y_min)/10)
     else:
         y_ticks = np.arange(0, 100, 10)
-    ylabels = [f'{round(x)}' for x in y_ticks]
+    ylabels = [f'{x:.2f}' for x in y_ticks]
     setup_plot_style(ax, xlabel=xlabel, ylabel=ylabel, x_ticks=xticks, xtick_labels=xlabels,
                      y_ticks=y_ticks, ytick_labels=ylabels)
     # 初始化图例位置，可以配标题
@@ -152,7 +154,7 @@ if __name__ == '__main__':
         with open(pickle_file, "rb") as f:
             game_history_ = pickle.load(f)
         error_time_range = get_observed_vehicle_road_change(game_history_)
-        choice_time_range = [error_time_range[0]-20, error_time_range[0]+20]
+        choice_time_range = [error_time_range[0]-5, error_time_range[0]+5]
         get_vehicle_state_in_game_history(game_history_, choice_time_range, legend_name, vehicle_collect_dict)
     draw_verb_jerk_vy_table(vehicle_collect_dict, ylabel="X-speed(m/s)", choice_flag="vx")
     draw_verb_jerk_vy_table(vehicle_collect_dict, ylabel="X-Jerk(m/s^3)", choice_flag="jerk_x")

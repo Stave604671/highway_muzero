@@ -82,6 +82,7 @@ class Vehicle(RoadObject):
         self.action = {"steering": 0, "acceleration": 0}
         self.crashed = False
         self.is_observed = is_observed
+        self.is_changing_lane = None
         self.impact = None
         self.log = []
         self.history = deque(maxlen=self.HISTORY_SIZE)
@@ -254,6 +255,10 @@ class Vehicle(RoadObject):
             self.heading = self.lane.heading_at(self.position[0])  # 将航向调整为车道的方向
             logger.info(f"{self.position[1]}--{target_lane_center_y}--{self.lane_index}")
         # 更新速度
+        smoothing_factor = 0.01  # 调整平滑因子，值越小，平滑效果越明显
+        self.action["acceleration"] = smoothing_factor * self.action["acceleration"] + (
+                    1 - smoothing_factor) * self.previous_acceleration_x
+
         self.speed += self.action["acceleration"] * dt
         # 计算当前时刻的横向和纵向加速度
         current_acceleration_x = self.action["acceleration"] * np.cos(self.heading)
