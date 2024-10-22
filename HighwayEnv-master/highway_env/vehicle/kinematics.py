@@ -35,6 +35,11 @@ class PIDController:
 
         return self.Kp * error + self.Ki * self.integral + self.Kd * derivative
 
+    def reset(self):
+        """重置积分和误差"""
+        self.integral = 0
+        self.last_error = 0
+
 
 class Vehicle(RoadObject):
     """
@@ -63,16 +68,17 @@ class Vehicle(RoadObject):
         position: Vector,
         heading: float = 0,
         speed: float = 0,
-        predition_type: str = "constant_steering",
-        pid_controller: PIDController = None,
+        prediction_type: str = "constant_steering",
+        pid_controller_steer: PIDController = None,
+        pid_acceleration: PIDController = None,
         is_observed: bool = False
     ):
         super().__init__(road, position, heading, speed)
         self.jerk_y = None
         self.jerk_x = None
-        self.previous_acceleration_y = None
-        self.previous_acceleration_x = None
-        self.prediction_type = predition_type
+        self.previous_acceleration_y = 0
+        self.previous_acceleration_x = 0
+        self.prediction_type = prediction_type
         self.action = {"steering": 0, "acceleration": 0}
         self.crashed = False
         self.is_observed = is_observed
@@ -82,7 +88,8 @@ class Vehicle(RoadObject):
         self.acceleration1 = 0.0
         self.previous_acceleration = 0.0  # 前一时刻的加速度
         self.jerk = 0.0  # 当前加加速度
-        self.pid_controller = pid_controller if pid_controller else PIDController(3, 0.05, 0.2)  # 默认 PID 参数
+        self.pid_controller_steer = pid_controller_steer if pid_controller_steer else PIDController(3, 0.05, 0.2)
+        self.pid_acceleration = pid_acceleration if pid_acceleration else PIDController(3, 0.05, 0.2)
 
     @classmethod
     def create_random(
@@ -203,7 +210,7 @@ class Vehicle(RoadObject):
                     if target_heading > 0:  # 避免向左转，保持直行或向右
                         target_heading = -target_heading
                 # print(f"1、看看有没有正确进if{self.action['steering']}：观测车辆车道{self.lane_index[2]}")
-                self.action["steering"] = self.pid_controller.update(target_heading, self.heading, dt)
+                self.action["steering"] = self.pid_controller_steer.update(target_heading, self.heading, dt)
                 # print("2、看看有没有正确进if：", self.action["steering"])
             else:
                 self.action["steering"] = 0  # 无障碍物时，保持直线行驶

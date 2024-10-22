@@ -103,7 +103,8 @@ def draw_verb_jerk_vy_table(tag_data, xlabel='Time(s)', ylabel="X-speed(m/s)", c
     if "v" in choice_flag:
         y_ticks = np.arange(0, 30, 2)
     elif "jerk" in choice_flag:
-        y_ticks = np.arange(-160, 160, 20)
+        y_min, y_max = ax.get_ylim()
+        y_ticks = np.arange(round(y_min), round(y_max), round((y_max-y_min)/10))
     else:
         y_ticks = np.arange(0, 100, 10)
     ylabels = [f'{round(x)}' for x in y_ticks]
@@ -154,8 +155,10 @@ if __name__ == '__main__':
         choice_time_range = [error_time_range[0]-20, error_time_range[0]+20]
         get_vehicle_state_in_game_history(game_history_, choice_time_range, legend_name, vehicle_collect_dict)
     draw_verb_jerk_vy_table(vehicle_collect_dict, ylabel="X-speed(m/s)", choice_flag="vx")
-    draw_verb_jerk_vy_table(vehicle_collect_dict, ylabel="X-Jerk(m/s^3)", choice_flag="jerk")
+    draw_verb_jerk_vy_table(vehicle_collect_dict, ylabel="X-Jerk(m/s^3)", choice_flag="jerk_x")
     draw_verb_jerk_vy_table(vehicle_collect_dict, ylabel="Y-speed(m/s)", choice_flag="vy")
+    draw_verb_jerk_vy_table(vehicle_collect_dict, ylabel="Y-Jerk(m/s^3)", choice_flag="jerk_y")
+
         # get_vehicle_state_in_game_history(game_history_, )
 
     # with open(r"C:\Users\lenovo\PycharmProjects\highway_muzero\HighwayEnv-master\test_history1021.pkl", "rb") as f:
