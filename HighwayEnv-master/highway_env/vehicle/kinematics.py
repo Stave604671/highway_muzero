@@ -41,7 +41,7 @@ def normalize_angle(angle):
 
 
 class DynamicReferencePath:
-    def __init__(self, length=100, num_points=1000, lane_width=4, safety_distance=2.5):
+    def __init__(self, length=30, num_points=300, lane_width=4, safety_distance=2.5):
         self.length = length  # 参考路径的长度
         self.num_points = num_points  # 参考路径的点数
         self.lane_width = lane_width  # 车道宽度
@@ -54,9 +54,11 @@ class DynamicReferencePath:
         Args:
             vehicles (list): A list of vehicle objects with a position attribute.
         """
-        # 生成基础路径
-        self.refer_path[:, 0] = np.linspace(0, self.length, self.num_points)
-        self.refer_path[:, 1] = 2 * np.sin(self.refer_path[:, 0] / 3.0) + 2.5 * np.cos(self.refer_path[:, 0] / 2.0)
+        vx, vy = vehicles[0].position  # 假设我们用第一个车辆的位置作为基准
+
+        # 生成基础路径并加上车辆位置偏移
+        self.refer_path[:, 0] = np.linspace(vx, vx + self.length, self.num_points)
+        self.refer_path[:, 1] = vy + 2 * np.sin(self.refer_path[:, 0] / 3.0) + 2.5 * np.cos(self.refer_path[:, 0] / 2.0)
 
         # 计算切线方向和曲率
         for i in range(self.num_points):
@@ -76,6 +78,14 @@ class DynamicReferencePath:
                 if dist < self.lane_width / 2 + self.safety_distance:  # 如果距离小于车道宽度加安全距离
                     # 调整参考路径
                     shift = self.lane_width / 2 + self.safety_distance - dist
+                    # 计算路径调整量，基于距离和震荡因子
+                    if dist < self.lane_width / 2:  # 距离非常近
+                        adjustment_factor = 1.0  # 完全调整
+                    else:  # 距离稍远
+                        adjustment_factor = 0.1  # 减少调整幅度
+                    # 限制最大调整幅度
+                    max_shift = 1.0  # 可以根据需求调整最大限制
+                    shift = min(shift * adjustment_factor, max_shift)
                     angle = self.refer_path[j, 2] + np.pi / 2  # 计算垂直于路径的方向
                     self.refer_path[j, 0] += shift * np.cos(angle)
                     self.refer_path[j, 1] += shift * np.sin(angle)
@@ -334,7 +344,7 @@ class Vehicle(RoadObject):
         # 使用LQR平滑角度
         if self.is_observed:
             steering_control = self.lqr_compute(dt)
-            max_steering_change = 0.1  # 最大转向角变化量
+            max_steering_change = 0.01  # 最大转向角变化量
             self.action["steering"] = np.clip(steering_control,
                                               self.action["steering"] - max_steering_change,
                                               self.action["steering"] + max_steering_change)

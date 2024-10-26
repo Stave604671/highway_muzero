@@ -326,8 +326,11 @@ class RoadGraphics:
                 VehicleGraphics.display_history(
                     v, surface, simulation=simulation_frequency, offscreen=offscreen
                 )
+
         for v in road.vehicles:
             VehicleGraphics.display(v, surface, offscreen=offscreen)
+            if v.is_observed:
+                VehicleGraphics.display_reference_path(v, surface)
 
     @staticmethod
     def display_road_objects(

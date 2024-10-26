@@ -28,6 +28,21 @@ class VehicleGraphics:
     EGO_COLOR = GREEN
 
     @classmethod
+    def display_reference_path(cls, vehicle, surface: WorldSurface) -> None:
+        """
+        Display the reference path as yellow dots on the pygame surface.
+
+        :param vehicle: The list of path points to be displayed
+        :param surface: The surface to draw the reference path on
+        """
+        refer_path = vehicle.dy_ref_path.refer_path  # 从车辆对象中获取参考路径
+
+        if refer_path is not None:  # 检查路径是否存在
+            for point in refer_path:
+                position = surface.pos2pix(point[0], point[1])  # 将世界坐标转换为像素坐标
+                pygame.draw.circle(surface, cls.YELLOW, position, 2)  # 绘制半径为3的黄色小点
+
+    @classmethod
     def display(
         cls,
         vehicle: Vehicle,
