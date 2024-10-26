@@ -64,8 +64,8 @@ class DynamicReferencePath:
 
         # 计算切线方向和曲率
         for i in range(self.num_points):
-            dx = self.refer_path[i, 0] - self.refer_path[i-1, 0] if i > 0 else 0.01
-            dy = self.refer_path[i, 1] - self.refer_path[i-1, 1] if i > 0 else 0.01
+            dx = self.refer_path[i, 0] - self.refer_path[i - 1, 0] if i > 0 else 0.01
+            dy = self.refer_path[i, 1] - self.refer_path[i - 1, 1] if i > 0 else 0.01
             self.refer_path[i, 2] = math.atan2(dy, dx)  # yaw
             if i > 0:
                 curvature = dy / (dx ** 2 + dy ** 2) ** (3 / 2)
@@ -217,14 +217,14 @@ class Vehicle(RoadObject):
 
     @classmethod
     def create_random(
-        cls,
-        road: Road,
-        speed: float = None,
-        lane_from: str | None = None,
-        lane_to: str | None = None,
-        lane_id: int | None = None,
-        spacing: float = 1,
-        is_observed: bool = False
+            cls,
+            road: Road,
+            speed: float = None,
+            lane_from: str | None = None,
+            lane_to: str | None = None,
+            lane_id: int | None = None,
+            spacing: float = 1,
+            is_observed: bool = False
     ) -> Vehicle:
         """
         Create a random vehicle on the road.
@@ -260,9 +260,9 @@ class Vehicle(RoadObject):
                 )
         default_spacing = 12 + 1.0 * speed
         offset = (
-            spacing
-            * default_spacing
-            * np.exp(-5 / 40 * len(road.network.graph[_from][_to]))
+                spacing
+                * default_spacing
+                * np.exp(-5 / 40 * len(road.network.graph[_from][_to]))
         )
         x0 = (
             np.max([lane.local_coordinates(v.position)[0] for v in road.vehicles])
@@ -326,7 +326,7 @@ class Vehicle(RoadObject):
         self.dy_ref_path.generate_path(self.road.vehicles)
         e, k, ref_yaw, s0 = self.dy_ref_path.calc_track_error(
             robot_state[0], robot_state[1])
-        ref_delta = math.atan2(self.L*k, 1)
+        ref_delta = math.atan2(self.L * k, 1)
         A = np.matrix([
             [1.0, 0.0, -self.speed * dt * math.sin(ref_yaw)],
             [0.0, 1.0, self.speed * dt * math.cos(ref_yaw)],
@@ -339,9 +339,9 @@ class Vehicle(RoadObject):
              (self.L * math.cos(ref_delta) * math.cos(ref_delta))]
         ])
 
-        x = robot_state[0:3]-self.dy_ref_path.refer_path[s0, 0:3]
+        x = robot_state[0:3] - self.dy_ref_path.refer_path[s0, 0:3]
         delta = self.lqr_controller.compute_control(x, A, B)
-        return delta+ref_delta
+        return delta + ref_delta
 
     def step(self, dt: float) -> None:
         """
@@ -361,15 +361,14 @@ class Vehicle(RoadObject):
                 self.action["acceleration"] - self.MAX_ACC_CHANGE,
                 self.action["acceleration"] + self.MAX_ACC_CHANGE
             )
-            obstacles = self.get_nearby_obstacles()  # 获取障碍物
-            if obstacles:
-                if self.lane_index[2] == 3 and steering_control > 0:  # 避免向左转，保持直行或向右
-                    steering_control = -steering_control
-                elif self.lane_index[2] == 0 and steering_control < 0:  # 避免向左转，保持直行或向右
-                    steering_control = -steering_control
-                else:
-                    steering_control = steering_control
-                self.action['steering'] = steering_control
+            # ray.logger.info(f"车速{self.speed}。目标航向{self.target_heading} 所属车道{self.lane_index[2]}此时转向角:{self.action['steering']}")
+            # obstacles = self.get_nearby_obstacles()  # 获取障碍物
+            # if obstacles:
+            # ray.logger.info(f"前方存在障碍物。此时转向角:{self.action['steering']}")
+            if self.lane_index[2] == 3 and self.action['steering'] > 0:  # 避免向左转，保持直行或向右
+                self.action['steering'] = - self.action['steering']
+            elif self.lane_index[2] == 0 and self.action['steering'] < 0:  # 避免向左转，保持直行或向右
+                self.action['steering'] = -self.action['steering']
             # else:
             #     self.action["steering"] = 0
         else:
