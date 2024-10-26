@@ -68,8 +68,9 @@ class MuZeroConfig:
         self.batch_size = 512  # Number of parts of games to train on at each training step
         # 多少轮保存一次数据
         self.checkpoint_interval = 10  # Number of training steps before using the model for self-playing
-        self.value_loss_weight = 1  # 缩放value loss避免过拟合,论文参数是0.25,直接给到五倍好了
+        self.value_loss_weight = 0.75  # 缩放value loss避免过拟合,论文参数是0.25,直接给到五倍好了
         self.entropy_loss_weight = 0.10  # 缩放entropy_loss
+        self.reward_loss_weight = 5
         self.train_on_gpu = torch.cuda.is_available()  # Train on GPU if available
         self.optimizer = "AdamW"  # "Adam" or "SGD". Paper uses SGD
         self.weight_decay = 1e-4  # L2 weights regularization
