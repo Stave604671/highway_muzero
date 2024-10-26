@@ -1,24 +1,21 @@
 from __future__ import annotations
-
+from typing import Union
 import copy
 from collections import deque
-
+import math
 import numpy as np
-# import ray
-from ray import logger
 from highway_env.road.road import Road
 from highway_env.utils import Vector
 from highway_env.vehicle.objects import RoadObject
 
 
 class PIDController:
-    def __init__(self, Kp: float, Ki: float, Kd: float, integral_limit: float = None) -> None:
+    def __init__(self, Kp: float, Ki: float, Kd: float) -> None:
         self.Kp = Kp
         self.Ki = Ki
         self.Kd = Kd
         self.last_error = 0
         self.integral = 0
-        self.integral_limit = integral_limit
 
     def update(self, target_heading: float, current_heading: float, dt: float) -> float:
         if dt <= 0:
@@ -26,9 +23,6 @@ class PIDController:
 
         error = target_heading - current_heading
         self.integral += error * dt
-
-        if self.integral_limit is not None:
-            self.integral = max(min(self.integral, self.integral_limit), -self.integral_limit)
 
         derivative = (error - self.last_error) / dt
         self.last_error = error
@@ -41,18 +35,131 @@ class PIDController:
         self.last_error = 0
 
 
+def normalize_angle(angle):
+    """Normalize an angle to the range [-pi, pi]."""
+    return math.atan2(math.sin(angle), math.cos(angle))
+
+
+class DynamicReferencePath:
+    def __init__(self, length=100, num_points=1000, lane_width=4, safety_distance=2.5):
+        self.length = length  # 参考路径的长度
+        self.num_points = num_points  # 参考路径的点数
+        self.lane_width = lane_width  # 车道宽度
+        self.safety_distance = safety_distance  # 安全距离
+        self.refer_path = np.zeros((num_points, 4))  # 初始化参考路径
+
+    def generate_path(self, vehicles):
+        """Generate a dynamic reference trajectory based on vehicle positions.
+
+        Args:
+            vehicles (list): A list of vehicle objects with a position attribute.
+        """
+        # 生成基础路径
+        self.refer_path[:, 0] = np.linspace(0, self.length, self.num_points)
+        self.refer_path[:, 1] = 2 * np.sin(self.refer_path[:, 0] / 3.0) + 2.5 * np.cos(self.refer_path[:, 0] / 2.0)
+
+        # 计算切线方向和曲率
+        for i in range(self.num_points):
+            dx = self.refer_path[i, 0] - self.refer_path[i-1, 0] if i > 0 else 0.01
+            dy = self.refer_path[i, 1] - self.refer_path[i-1, 1] if i > 0 else 0.01
+            self.refer_path[i, 2] = math.atan2(dy, dx)  # yaw
+            if i > 0:
+                curvature = dy / (dx ** 2 + dy ** 2) ** (3 / 2)
+                self.refer_path[i, 3] = curvature  # 曲率k
+
+        # 避障逻辑
+        for vehicle in vehicles:
+            vx, vy = vehicle.position  # 获取车辆的当前位置
+            # 计算与参考路径的距离并调整
+            for j in range(self.num_points):
+                dist = np.sqrt((self.refer_path[j, 0] - vx) ** 2 + (self.refer_path[j, 1] - vy) ** 2)
+                if dist < self.lane_width / 2 + self.safety_distance:  # 如果距离小于车道宽度加安全距离
+                    # 调整参考路径
+                    shift = self.lane_width / 2 + self.safety_distance - dist
+                    angle = self.refer_path[j, 2] + np.pi / 2  # 计算垂直于路径的方向
+                    self.refer_path[j, 0] += shift * np.cos(angle)
+                    self.refer_path[j, 1] += shift * np.sin(angle)
+
+    def calc_track_error(self, x, y):
+        """Calculate tracking error.
+
+        Args:
+            x (float): Current vehicle position x.
+            y (float): Current vehicle position y.
+
+        Returns:
+            tuple: (error, curvature, yaw, index)
+        """
+        # 寻找参考轨迹最近目标点
+        d_x = self.refer_path[:, 0] - x
+        d_y = self.refer_path[:, 1] - y
+        d = np.sqrt(d_x ** 2 + d_y ** 2)
+        s = np.argmin(d)  # 最近目标点索引
+
+        yaw = self.refer_path[s, 2]
+        k = self.refer_path[s, 3]
+        angle = normalize_angle(yaw - math.atan2(d_y[s], d_x[s]))
+        e = d[s]  # 误差
+        if angle < 0:
+            e *= -1
+
+        return e, k, yaw, s
+
+
+class LQRController:
+    def __init__(self, N=100, EPS=1e-4):
+        """
+        初始化LQR控制器
+        :param N: 最大迭代次数
+        :param EPS: 迭代精度
+        """
+        self.Q = np.eye(3) * 3
+        self.R = np.eye(2) * 2.
+        self.N = N
+        self.EPS = EPS
+
+    def solve_riccati(self, A, B):
+        """
+        解代数Riccati方程
+        :param A: 状态矩阵A
+        :param B: 输入矩阵B
+        :return: P矩阵
+        """
+        P = self.Q
+        for _ in range(self.N):
+            P_next = self.Q + A.T @ P @ A - A.T @ P @ B @ np.linalg.pinv(self.R + B.T @ P @ B) @ B.T @ P @ A
+            if np.abs(P_next - P).max() < self.EPS:
+                break
+            P = P_next
+        return P
+
+    def compute_control(self, x, A, B):
+        """
+        计算LQR控制输入
+        :param x: 状态误差
+        :param A: 状态矩阵A
+        :param B: 输入矩阵B
+        :return: 控制输入u
+        """
+        P = self.solve_riccati(A, B)
+        K = -np.linalg.pinv(self.R + B.T @ P @ B) @ B.T @ P @ A
+        u = K @ x
+        return u[0, 1]
+
+
 class Vehicle(RoadObject):
     """
     A moving vehicle on a road, and its kinematics.
 
     The vehicle is represented by a dynamical system: a modified bicycle model.
-    It's state is propagated depending on its steering and acceleration actions.
+    It is state is propagated depending on its steering and acceleration actions.
     """
 
     LENGTH = 5.0
     """ Vehicle length [m] """
     WIDTH = 2.0
     """ Vehicle width [m] """
+    L = 2.0
     DEFAULT_INITIAL_SPEEDS = [20, 25]  # 论文要求的初始车速
     """ Range for random initial speeds [m/s] """
     MAX_SPEED = 30.0
@@ -63,15 +170,14 @@ class Vehicle(RoadObject):
     """ Length of the vehicle state history, for trajectory display"""
 
     def __init__(
-        self,
-        road: Road,
-        position: Vector,
-        heading: float = 0,
-        speed: float = 0,
-        prediction_type: str = "constant_steering",
-        pid_controller_steer: PIDController = None,
-        pid_acceleration: PIDController = None,
-        is_observed: bool = False
+            self,
+            road: Road,
+            position: Vector,
+            heading: float = 0,
+            speed: float = 0,
+            prediction_type: str = "constant_steering",
+            pid_acceleration: PIDController = None,
+            is_observed: bool = False
     ):
         super().__init__(road, position, heading, speed)
         self.jerk_y = None
@@ -79,7 +185,7 @@ class Vehicle(RoadObject):
         self.previous_acceleration_y = 0
         self.previous_acceleration_x = 0
         self.prediction_type = prediction_type
-        self.action = {"steering": 0, "acceleration": 0}
+        self.action: dict[str, Union[float, np.ndarray]] = {"steering": 0.0, "acceleration": 0.0}
         self.crashed = False
         self.is_observed = is_observed
         self.is_changing_lane = None
@@ -89,8 +195,9 @@ class Vehicle(RoadObject):
         self.acceleration1 = 0.0
         self.previous_acceleration = 0.0  # 前一时刻的加速度
         self.jerk = 0.0  # 当前加加速度
-        self.pid_controller_steer = pid_controller_steer if pid_controller_steer else PIDController(3, 0.05, 0.2)
-        self.pid_acceleration = pid_acceleration if pid_acceleration else PIDController(3, 0.05, 0.2)
+        self.pid_controller_acceleration = pid_acceleration if pid_acceleration else PIDController(3, 0.05, 0.2)
+        self.dy_ref_path = DynamicReferencePath()
+        self.lqr_controller = LQRController()
 
     @classmethod
     def create_random(
@@ -175,10 +282,13 @@ class Vehicle(RoadObject):
             self.action = action
 
     def get_nearby_obstacles(self, distance_threshold: float = LENGTH) -> list[RoadObject]:
-        nearby_obstacles = []#将当前车辆的位置 self.position 转换为一个 NumPy 数组，确保后续可以进行矢量运算。self.position 应该是当前车辆在道路上的二维坐标。
+        nearby_obstacles = []  # 将当前车辆的位置 self.position 转换为一个 NumPy 数组，确保后续可以进行矢量运算。self.position 应该是当前车辆在道路上的二维坐标。
         # 观测车辆的坐标
         self_pos = np.array(self.position)  # 确保是 numpy 数组
-        for obj_id, obj in enumerate(self.road.vehicles):  # 假设车辆也算作障碍物，这个循环遍历 self.road.vehicles 中的所有车辆。self.road 表示当前车辆所在的道路，self.road.vehicles 是该道路上所有车辆的列表。
+        # 假设车辆也算作障碍物，这个循环遍历 self.road.vehicles 中的所有车辆。self.road 表示当前车辆所在的道路，
+        # self.road.vehicles 是该道路上所有车辆的列表。
+        for obj_id, obj in enumerate(
+                self.road.vehicles):
             # 如果是非观测车辆
             if not obj.is_observed:
                 # 获取非观测车辆的坐标
@@ -187,96 +297,95 @@ class Vehicle(RoadObject):
                 distance = np.linalg.norm(obj_pos - self_pos)
                 # 这里不能简单给10，如果是以像素为单位，直线上建议把这个距离给一个车的长度，考虑到变道后隔壁车道也有车，应该在求一个三角形斜边（有兴趣你自己加）
                 # print(f"观测车辆车道{self.lane_index[2]}-要避障的车辆的车道-{obj.lane_index[2]}")
-                if distance < distance_threshold*2.5 and self.lane_index[2] == obj.lane_index[2]:
+                if distance < distance_threshold * 2.5 and self.lane_index[2] == obj.lane_index[2]:
                     nearby_obstacles.append(obj)
         return nearby_obstacles
+
+    def lqr_compute(self, dt):
+        robot_state = np.zeros(4)
+        robot_state[0] = self.position[0]
+        robot_state[1] = self.position[1]
+        robot_state[2] = self.action['steering']
+        robot_state[3] = self.speed
+        self.dy_ref_path.generate_path(self.road.vehicles)
+        e, k, ref_yaw, s0 = self.dy_ref_path.calc_track_error(
+            robot_state[0], robot_state[1])
+        ref_delta = math.atan2(self.L*k, 1)
+        A = np.matrix([
+            [1.0, 0.0, -self.speed * dt * math.sin(ref_yaw)],
+            [0.0, 1.0, self.speed * dt * math.cos(ref_yaw)],
+            [0.0, 0.0, 1.0]])
+
+        B = np.matrix([
+            [dt * math.cos(ref_yaw), 0],
+            [dt * math.sin(ref_yaw), 0],
+            [dt * math.tan(ref_delta) / self.L, self.speed * dt /
+             (self.L * math.cos(ref_delta) * math.cos(ref_delta))]
+        ])
+
+        x = robot_state[0:3]-self.dy_ref_path.refer_path[s0, 0:3]
+        delta = self.lqr_controller.compute_control(x, A, B)
+        return delta+ref_delta
 
     def step(self, dt: float) -> None:
         """
         Propagate the vehicle state given its actions.
         """
-
+        # 使用LQR平滑角度
         if self.is_observed:
-            # logger.info(f"观测车辆当前车速：{self.speed}")
-            obstacles = self.get_nearby_obstacles()  # 获取障碍物
-            if obstacles:
-                closest_obstacle = min(obstacles, key=lambda obs: np.linalg.norm(obs.position - self.position))
-                direction_to_obstacle = closest_obstacle.position - self.position
-                target_heading = np.arctan2(direction_to_obstacle[1], direction_to_obstacle[0]) + np.pi/2
-                # print(f"{self.lane_index[2]}--{type(self.lane_index[2])}--{target_heading}--{type(target_heading)}")
-                if self.lane_index[2] == 0:
-                    if target_heading < 0:  # 避免向左转，保持直行或向右
-                        target_heading = -target_heading
-                elif self.lane_index[2] == 3:
-                    if target_heading > 0:  # 避免向左转，保持直行或向右
-                        target_heading = -target_heading
-                # print(f"1、看看有没有正确进if{self.action['steering']}：观测车辆车道{self.lane_index[2]}")
-                self.action["steering"] = self.pid_controller_steer.update(target_heading, self.heading, dt)
-                # print("2、看看有没有正确进if：", self.action["steering"])
-            else:
-                self.action["steering"] = 0  # 无障碍物时，保持直线行驶
+            steering_control = self.lqr_compute(dt)
+            max_steering_change = 0.1  # 最大转向角变化量
+            self.action["steering"] = np.clip(steering_control,
+                                              self.action["steering"] - max_steering_change,
+                                              self.action["steering"] + max_steering_change)
+            # 计算目标速度
+            target_speed = 30
+            # PID平滑加速度
+            acceleration_control = self.pid_controller_acceleration.update(target_speed, self.speed, dt)
+            # 限制变化量
+            max_acceleration_change = 0.01  # 最大加速度变化量
+            self.action["acceleration"] = np.clip(
+                acceleration_control,
+                self.action["acceleration"] - max_acceleration_change,
+                self.action["acceleration"] + max_acceleration_change
+            )
         else:
-            self.action["steering"] = 0  # 非观察车辆时，保持直线行驶
+            self.action["steering"] = 0
 
         self.clip_actions()
-        delta_f = self.action["steering"]  # 使用 PID 控制的 steering
-        beta = np.arctan(1 / 2 * np.tan(delta_f))  # 侧滑角
-        self.heading += self.action["steering"] * dt
-        v = self.speed * np.array([np.cos(self.heading), np.sin(self.heading)])
+
+        delta_f = self.action["steering"]
+        beta = np.arctan(1 / 2 * np.tan(delta_f))
+        v = self.speed * np.array([np.cos(self.heading + beta), np.sin(self.heading + beta)])
         self.position += v * dt
 
-        # 碰撞检测
         if self.impact is not None:
             self.position += self.impact
             self.crashed = True
             self.impact = None
 
-        # 处理换道逻辑
-        new_lane_index = self.road.network.get_closest_lane_index(self.position, self.heading)
-        # if self.is_observed:
-        #     logger.info(f"当前车道：{self.lane_index[2]}。当前位置：{self.position[1]} 换道目标车道：{new_lane_index[2]}.")
-        if new_lane_index[2] != self.lane_index[2]:
-            # 计算新车道中心位置，假设车道宽度为4
-            """
-            0
-            --1     1车道中心坐标=（0+0.5）*4=0.5*4=2
-            4
-            --2     2车道中心坐标=（1+0.5）*4=1.5*4=6
-            8
-            --3     3车道中心坐标=（2+0.5）*4=2.5*4-2=10-2 = 8
-            12
-            --4     4车道中心坐标=（3+0.5）*4-2=3.5*4-2=14-2=12
-            16
-            """
-            target_lane_center_y = (new_lane_index[2] + 0.5) * 4 - 2  # 车道宽度为4
-            self.position[1] = target_lane_center_y  # 移动车辆到新车道的中心位置
-            self.lane_index = new_lane_index
-            self.lane = self.road.network.get_lane(self.lane_index)
-            self.heading = self.lane.heading_at(self.position[0])  # 将航向调整为车道的方向
-            # logger.info(f"{self.position[1]}--{target_lane_center_y}--{self.lane_index}")
-        # 更新速度
-        smoothing_factor = 0.01  # 调整平滑因子，值越小，平滑效果越明显
-        self.action["acceleration"] = smoothing_factor * self.action["acceleration"] + (
-                    1 - smoothing_factor) * self.previous_acceleration_x
-
+        # 更新航向和速度
+        self.heading += self.speed * np.sin(beta) / (self.LENGTH / 2) * dt
         self.speed += self.action["acceleration"] * dt
+
+        # 调用状态更新
+        self.collect_jerk_message(dt)
+        # 调用状态更新
+        self.on_state_update()
+
+    def collect_jerk_message(self, dt):
         # 计算当前时刻的横向和纵向加速度
         current_acceleration_x = self.action["acceleration"] * np.cos(self.heading)
         current_acceleration_y = self.action["acceleration"] * np.sin(self.heading)
-
         # 计算横向和纵向加加速度（jerk），jerk = 加速度的变化 / 时间差
         jerk_x = (current_acceleration_x - self.previous_acceleration_x) / dt
         jerk_y = (current_acceleration_y - self.previous_acceleration_y) / dt
-
         # 更新前一时刻的加速度值
         self.previous_acceleration_x = current_acceleration_x
         self.previous_acceleration_y = current_acceleration_y
-
         # 输出当前横向和纵向的加加速度
         self.jerk_x = jerk_x
         self.jerk_y = jerk_y
-        # 调用状态更新
-        self.on_state_update()
 
     @property
     def get_jerk_x(self) -> float:
@@ -323,14 +432,14 @@ class Vehicle(RoadObject):
                 self.history.appendleft(self.create_from(self))
 
     def predict_trajectory_constant_speed(
-        self, times: np.ndarray
+            self, times: np.ndarray
     ) -> tuple[list[np.ndarray], list[float]]:
         if self.prediction_type == "zero_steering":
             action = {"acceleration": 0.0, "steering": 0.0}
         elif self.prediction_type == "constant_steering":
             action = {"acceleration": 0.0, "steering": self.action["steering"]}
         else:
-            raise ValueError("Unknown predition type")
+            raise ValueError("Unknown prediction type")
 
         dt = np.diff(np.concatenate(([0.0], times)))
 
@@ -342,7 +451,7 @@ class Vehicle(RoadObject):
             v.step(t)
             positions.append(v.position.copy())
             headings.append(v.heading)
-        return (positions, headings)
+        return positions, headings
 
     @property
     def velocity(self) -> np.ndarray:
@@ -381,7 +490,7 @@ class Vehicle(RoadObject):
             return np.zeros((3,))
 
     def to_dict(
-        self, origin_vehicle: Vehicle = None, observe_intentions: bool = True
+            self, origin_vehicle: Vehicle = None, observe_intentions: bool = True
     ) -> dict:
         d = {
             "presence": 1,
@@ -415,11 +524,11 @@ class Vehicle(RoadObject):
         return self.__str__()
 
     def predict_trajectory(
-        self,
-        actions: list,
-        action_duration: float,
-        trajectory_timestep: float,
-        dt: float,
+            self,
+            actions: list,
+            action_duration: float,
+            trajectory_timestep: float,
+            dt: float,
     ) -> list[Vehicle]:
         """
         Predict the future trajectory of the vehicle given a sequence of actions.
