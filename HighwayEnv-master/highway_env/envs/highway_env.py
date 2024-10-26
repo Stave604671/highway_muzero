@@ -104,8 +104,6 @@ class HighwayEnv(AbstractEnv):
         :return: the corresponding reward
         """
         rewards = self._rewards(action)
-        ray.logger.info(f"rewards:{rewards}")
-        ray.logger.info(f"config:{self.config}")
         reward = sum(
             self.config.get(name, 0) * reward for name, reward in rewards.items()
         )
@@ -114,7 +112,7 @@ class HighwayEnv(AbstractEnv):
                 reward,
                 [
                     self.config["collision_reward"] + self.config["lane_change_reward"],
-                    self.config["high_speed_reward"] + self.config["right_lane_reward"],
+                    self.config["high_speed_reward"] + self.config["right_lane_reward"]+1,
                 ],
                 [0, 1],
             )

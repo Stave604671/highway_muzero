@@ -361,15 +361,15 @@ class Vehicle(RoadObject):
                 self.action["acceleration"] - self.MAX_ACC_CHANGE,
                 self.action["acceleration"] + self.MAX_ACC_CHANGE
             )
-            # obstacles = self.get_nearby_obstacles()  # 获取障碍物
-            # if obstacles:
-            #     if self.lane_index[2] == 3 and steering_control > 0:  # 避免向左转，保持直行或向右
-            #         steering_control = -steering_control
-            #     elif self.lane_index[2] == 0 and steering_control < 0:  # 避免向左转，保持直行或向右
-            #         steering_control = -steering_control
-            #     else:
-            #         steering_control = steering_control
-            #     self.action['steering'] = steering_control
+            obstacles = self.get_nearby_obstacles()  # 获取障碍物
+            if obstacles:
+                if self.lane_index[2] == 3 and steering_control > 0:  # 避免向左转，保持直行或向右
+                    steering_control = -steering_control
+                elif self.lane_index[2] == 0 and steering_control < 0:  # 避免向左转，保持直行或向右
+                    steering_control = -steering_control
+                else:
+                    steering_control = steering_control
+                self.action['steering'] = steering_control
             # else:
             #     self.action["steering"] = 0
         else:
