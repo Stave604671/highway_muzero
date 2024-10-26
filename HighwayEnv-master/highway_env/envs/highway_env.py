@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+import ray
 
 from highway_env import utils
 from highway_env.envs.common.abstract import AbstractEnv
@@ -45,6 +46,8 @@ class HighwayEnv(AbstractEnv):
                 # lower speeds according to config["reward_speed_range"].
                 "lane_change_reward": 0,  # The reward received at each lane change action.
                 "reward_speed_range": [20, 30],
+                'safe_distance_reward': 0.5,
+                'on_road_reward': 1,
                 "normalize_reward": True,
                 "offroad_terminal": False,
             }
@@ -101,6 +104,8 @@ class HighwayEnv(AbstractEnv):
         :return: the corresponding reward
         """
         rewards = self._rewards(action)
+        ray.logger.info(f"rewards:{rewards}")
+        ray.logger.info(f"config:{self.config}")
         reward = sum(
             self.config.get(name, 0) * reward for name, reward in rewards.items()
         )
