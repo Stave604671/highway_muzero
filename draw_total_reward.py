@@ -94,7 +94,7 @@ def draw_total_reward_plt(tag_data):
         steps_ = range(0, steps.shape[0])
         ax.plot(steps_, data_values, label=label, color=color, linewidth=1)
     # 设置x轴刻度
-    xticks = np.arange(0, 20000, 4000)  # 生成 5 等份的刻度线
+    xticks = np.arange(0, 10000, 2000)  # 生成 5 等份的刻度线
     xlabels = [f'{x / 10000:1.1f}' for x in xticks]
     xlabels[0] = "0.0"
     # 设置y轴刻度

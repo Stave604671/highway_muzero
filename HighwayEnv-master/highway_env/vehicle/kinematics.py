@@ -4,6 +4,8 @@ import copy
 from collections import deque
 import math
 import numpy as np
+import ray
+
 from highway_env.road.road import Road
 from highway_env.utils import Vector
 from highway_env.vehicle.objects import RoadObject
@@ -80,9 +82,9 @@ class DynamicReferencePath:
                     shift = self.lane_width / 2 + self.safety_distance - dist
                     # 计算路径调整量，基于距离和震荡因子
                     if dist < self.lane_width / 2:  # 距离非常近
-                        adjustment_factor = 1.0  # 完全调整
+                        adjustment_factor = 0.5  # 完全调整
                     else:  # 距离稍远
-                        adjustment_factor = 0.1  # 减少调整幅度
+                        adjustment_factor = 0.01  # 减少调整幅度
                     # 限制最大调整幅度
                     max_shift = 1.0  # 可以根据需求调整最大限制
                     shift = min(shift * adjustment_factor, max_shift)
@@ -311,11 +313,11 @@ class Vehicle(RoadObject):
                     nearby_obstacles.append(obj)
         return nearby_obstacles
 
-    def lqr_compute(self, dt):
+    def lqr_compute(self, dt, steering):
         robot_state = np.zeros(4)
         robot_state[0] = self.position[0]
         robot_state[1] = self.position[1]
-        robot_state[2] = self.action['steering']
+        robot_state[2] = steering
         robot_state[3] = self.speed
         self.dy_ref_path.generate_path(self.road.vehicles)
         e, k, ref_yaw, s0 = self.dy_ref_path.calc_track_error(
@@ -343,25 +345,36 @@ class Vehicle(RoadObject):
         """
         # 使用LQR平滑角度
         if self.is_observed:
-            steering_control = self.lqr_compute(dt)
-            max_steering_change = 0.01  # 最大转向角变化量
-            self.action["steering"] = np.clip(steering_control,
-                                              self.action["steering"] - max_steering_change,
-                                              self.action["steering"] + max_steering_change)
-            # 计算目标速度
-            target_speed = 30
-            # PID平滑加速度
-            acceleration_control = self.pid_controller_acceleration.update(target_speed, self.speed, dt)
-            # 限制变化量
-            max_acceleration_change = 0.01  # 最大加速度变化量
-            self.action["acceleration"] = np.clip(
-                acceleration_control,
-                self.action["acceleration"] - max_acceleration_change,
-                self.action["acceleration"] + max_acceleration_change
-            )
-        else:
-            self.action["steering"] = 0
+            obstacles = self.get_nearby_obstacles()  # 获取障碍物
+            if obstacles:
+                steering_control = self.lqr_compute(dt, self.action['steering'])
 
+                if self.lane_index[2] == 3 and steering_control > 0:  # 避免向左转，保持直行或向右
+                    ray.logger.info(f"车辆在第三车道试图左转，改右转")
+                    steering_control = -steering_control
+                elif self.lane_index[2] == 0 and steering_control < 0:  # 避免向左转，保持直行或向右
+                    steering_control = -steering_control
+                max_steering_change = 0.1  # 最大转向角变化量
+                ray.logger.info(f"{steering_control}--1-{self.action['steering']}?车速{self.speed}")
+                self.action["steering"] = np.clip(steering_control,
+                                                  self.action["steering"] - max_steering_change,
+                                                  self.action["steering"] + max_steering_change)
+                ray.logger.info(f"{steering_control}--2-{self.action['steering']}?车速{self.speed}")
+                # 计算目标速度
+                target_speed = 30
+                # PID平滑加速度
+                acceleration_control = self.pid_controller_acceleration.update(target_speed, self.speed, dt)
+                # 限制变化量
+                max_acceleration_change = 0.01  # 最大加速度变化量
+                self.action["acceleration"] = np.clip(
+                    acceleration_control,
+                    self.action["acceleration"] - max_acceleration_change,
+                    self.action["acceleration"] + max_acceleration_change
+                )
+            else:
+                self.action["steering"] = 0
+        else:
+            self.action['steering'] = 0
         self.clip_actions()
 
         delta_f = self.action["steering"]

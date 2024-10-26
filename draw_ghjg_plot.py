@@ -210,14 +210,12 @@ def draw_ghjg_by_vehicle_history(game_history, time_range):
                 vehicle_collect_dict[vehicle_id] = {"x": [vehicle.position[0]],
                                                     "y": [vehicle.position[1]],
                                                     "vx": [vehicle.get_verb_x],
-                                                    "vy": [vehicle.get_verb_y],
-                                                    "jerk": [vehicle.get_jerk]}
+                                                    "vy": [vehicle.get_verb_y]}
             else:
                 vehicle_collect_dict[vehicle_id]['x'].append(vehicle.position[0])
                 vehicle_collect_dict[vehicle_id]['y'].append(vehicle.position[1])
                 vehicle_collect_dict[vehicle_id]['vx'].append(vehicle.get_verb_x)
                 vehicle_collect_dict[vehicle_id]['vy'].append(vehicle.get_verb_y)
-                vehicle_collect_dict[vehicle_id]['jerk'].append(vehicle.get_jerk)
     draw_total_ghjg_plt(vehicle_collect_dict, data_type="vehicle_space")
 
 
