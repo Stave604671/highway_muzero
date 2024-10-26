@@ -180,6 +180,8 @@ class Vehicle(RoadObject):
     """ Minimum reachable speed [m/s] """
     HISTORY_SIZE = 30
     """ Length of the vehicle state history, for trajectory display"""
+    MAX_STEERING_CHANGE = 0.1
+    MAX_ACC_CHANGE = 0.01
 
     def __init__(
             self,
@@ -192,6 +194,8 @@ class Vehicle(RoadObject):
             is_observed: bool = False
     ):
         super().__init__(road, position, heading, speed)
+        self.target_heading = None
+        self.target_lane_center_y = None
         self.jerk_y = None
         self.jerk_x = None
         self.previous_acceleration_y = 0
@@ -345,34 +349,29 @@ class Vehicle(RoadObject):
         """
         # 使用LQR平滑角度
         if self.is_observed:
-            obstacles = self.get_nearby_obstacles()  # 获取障碍物
-            if obstacles:
-                steering_control = self.lqr_compute(dt, self.action['steering'])
-
-                if self.lane_index[2] == 3 and steering_control > 0:  # 避免向左转，保持直行或向右
-                    ray.logger.info(f"车辆在第三车道试图左转，改右转")
-                    steering_control = -steering_control
-                elif self.lane_index[2] == 0 and steering_control < 0:  # 避免向左转，保持直行或向右
-                    steering_control = -steering_control
-                max_steering_change = 0.1  # 最大转向角变化量
-                ray.logger.info(f"{steering_control}--1-{self.action['steering']}?车速{self.speed}")
-                self.action["steering"] = np.clip(steering_control,
-                                                  self.action["steering"] - max_steering_change,
-                                                  self.action["steering"] + max_steering_change)
-                ray.logger.info(f"{steering_control}--2-{self.action['steering']}?车速{self.speed}")
-                # 计算目标速度
-                target_speed = 30
-                # PID平滑加速度
-                acceleration_control = self.pid_controller_acceleration.update(target_speed, self.speed, dt)
-                # 限制变化量
-                max_acceleration_change = 0.01  # 最大加速度变化量
-                self.action["acceleration"] = np.clip(
-                    acceleration_control,
-                    self.action["acceleration"] - max_acceleration_change,
-                    self.action["acceleration"] + max_acceleration_change
-                )
-            else:
-                self.action["steering"] = 0
+            steering_control = self.lqr_compute(dt, self.action['steering'])
+            self.action["steering"] = np.clip(steering_control,
+                                              self.action["steering"] - self.MAX_STEERING_CHANGE,
+                                              self.action["steering"] + self.MAX_STEERING_CHANGE)
+            # PID平滑加速度
+            acceleration_control = self.pid_controller_acceleration.update(self.MAX_SPEED, self.speed, dt)
+            # 限制变化量
+            self.action["acceleration"] = np.clip(
+                acceleration_control,
+                self.action["acceleration"] - self.MAX_ACC_CHANGE,
+                self.action["acceleration"] + self.MAX_ACC_CHANGE
+            )
+            # obstacles = self.get_nearby_obstacles()  # 获取障碍物
+            # if obstacles:
+            #     if self.lane_index[2] == 3 and steering_control > 0:  # 避免向左转，保持直行或向右
+            #         steering_control = -steering_control
+            #     elif self.lane_index[2] == 0 and steering_control < 0:  # 避免向左转，保持直行或向右
+            #         steering_control = -steering_control
+            #     else:
+            #         steering_control = steering_control
+            #     self.action['steering'] = steering_control
+            # else:
+            #     self.action["steering"] = 0
         else:
             self.action['steering'] = 0
         self.clip_actions()
@@ -386,11 +385,38 @@ class Vehicle(RoadObject):
             self.position += self.impact
             self.crashed = True
             self.impact = None
-
-        # 更新航向和速度
         self.heading += self.speed * np.sin(beta) / (self.LENGTH / 2) * dt
         self.speed += self.action["acceleration"] * dt
+        # 处理换道逻辑
+        # 更新车辆的朝向
+        # 初始化换道参数
+        if not hasattr(self, 'is_changing_lane'):
+            self.is_changing_lane = False
+            self.target_lane_center_y = None
+        new_lane_index = self.road.network.get_closest_lane_index(self.position, self.heading)
 
+        # 检查是否需要更改车道
+        if new_lane_index[2] != self.lane_index[2] and not self.is_changing_lane:
+            # 设置换道目标位置
+            self.target_lane_center_y = (new_lane_index[2] + 0.5) * 4 - 2  # 车道宽度为4
+            self.target_heading = self.lane.heading_at(self.position[0])  # 目标车道的航向
+            self.is_changing_lane = True  # 标记正在换道
+            self.lane_index = new_lane_index
+            self.lane = self.road.network.get_lane(self.lane_index)
+
+        # 换道过程平滑处理
+        if self.is_changing_lane:
+            # 逐步调整位置和车头方向
+            delta_y = (self.target_lane_center_y - self.position[1]) * 0.4  # 小步移动
+            self.position[1] += delta_y
+            delta_heading = (self.target_heading - self.heading) * 0.4  # 小步调整航向
+            self.heading += delta_heading
+            # 当接近目标位置和目标朝向时，结束换道过程
+            if abs(self.position[1] - self.target_lane_center_y) < 0.1 and abs(
+                    self.heading - self.target_heading) < 0.1:
+                self.position[1] = self.target_lane_center_y
+                self.heading = self.target_heading
+                self.is_changing_lane = False  # 换道完成
         # 调用状态更新
         self.collect_jerk_message(dt)
         # 调用状态更新

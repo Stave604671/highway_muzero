@@ -102,11 +102,11 @@ def draw_verb_jerk_vy_table(tag_data, xlabel='Time(s)', ylabel="X-speed(m/s)", c
     # 设置y轴刻度
     if "v" in choice_flag:
         y_min, y_max = ax.get_ylim()
-        y_ticks = np.arange(round(y_min), round(y_max), round((y_max-y_min)/10))
+        y_ticks = np.arange(y_min, y_max, (y_max-y_min)/10)
         # y_ticks = np.arange(-30, 30, 2)
     elif "jerk" in choice_flag:
         y_min, y_max = ax.get_ylim()
-        y_ticks = np.arange(round(y_min), round(y_max), (y_max-y_min)/10)
+        y_ticks = np.arange(y_min, y_max, (y_max-y_min)/10)
     else:
         y_ticks = np.arange(0, 100, 10)
     ylabels = [f'{x:.2f}' for x in y_ticks]
