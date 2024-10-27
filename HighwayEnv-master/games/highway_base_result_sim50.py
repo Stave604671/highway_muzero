@@ -68,9 +68,9 @@ class MuZeroConfig:
         self.batch_size = 512  # Number of parts of games to train on at each training step
         # 多少轮保存一次数据
         self.checkpoint_interval = 10  # Number of training steps before using the model for self-playing
-        self.value_loss_weight = 0.75  # 缩放value loss避免过拟合,论文参数是0.25,直接给到五倍好了
-        self.entropy_loss_weight = 0.10  # 缩放entropy_loss
-        self.reward_loss_weight = 5
+        self.value_loss_weight = 1.5  # 缩放value loss避免过拟合,论文参数是0.25,直接给到五倍好了
+        self.entropy_loss_weight = 0.5  # 缩放entropy_loss
+        self.reward_loss_weight = 3
         self.train_on_gpu = torch.cuda.is_available()  # Train on GPU if available
         self.optimizer = "AdamW"  # "Adam" or "SGD". Paper uses SGD
         self.weight_decay = 1e-4  # L2 weights regularization
@@ -78,26 +78,26 @@ class MuZeroConfig:
 
         # Exponential learning rate schedule
         self.lr_init = 0.004  # Initial learning rate
-        self.lr_decay_rate = 1  # Set it to 1 to use a constant learning rate
+        self.lr_decay_rate = 0.95  # Set it to 1 to use a constant learning rate
         self.lr_decay_steps = 1000
 
         ### Replay Buffer
         self.replay_buffer_size = int(1e6)  # 缓存空间中记录的自我监督的数据数量,给高了的话,容易引入噪声,如果给低了,性能不佳不稳定
 
-        self.num_unroll_steps = 20  # 每个批次中保留多少数量的moves的数据
+        self.num_unroll_steps = 30  # 每个批次中保留多少数量的moves的数据
 
-        self.td_steps = 50  # Number of steps in the future to take into account for calculating the target value
+        self.td_steps = 75  # Number of steps in the future to take into account for calculating the target value
 
         self.PER = True  # Prioritized Replay (See paper appendix Training), select in priority the elements in the replay buffer which are unexpected for the network
-        self.PER_alpha = 1.0  # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
+        self.PER_alpha = 0.6  # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
 
         # Reanalyze (See paper appendix Reanalyse)
         self.use_last_model_value = True  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
         self.reanalyse_on_gpu = False   # windows下需要都打开，linux没限制
 
         ### Adjust the self play / training ratio to avoid over/underfitting
-        self.self_play_delay = 0.5  # Number of seconds to wait after each played game
-        self.training_delay = 0.5  # Number of seconds to wait after each training step
+        self.self_play_delay = 0.25  # Number of seconds to wait after each played game
+        self.training_delay = 0.75  # Number of seconds to wait after each training step
         self.ratio = 0.75  # Desired training steps per self played step ratio. Equivalent to a synchronous version, training can take much longer. Set it to None to disable it
         # fmt: on
 

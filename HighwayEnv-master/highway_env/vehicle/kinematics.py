@@ -392,90 +392,38 @@ class Vehicle(RoadObject):
         if not hasattr(self, 'is_changing_lane'):
             self.is_changing_lane = False
             self.target_lane_center_y = None
-        new_lane_index = self.road.network.get_closest_lane_index(self.position, self.heading)
-
-        # 检查是否需要更改车道
-        if new_lane_index[2] != self.lane_index[2] and not self.is_changing_lane:
-            # 设置换道目标位置
-            self.target_lane_center_y = (new_lane_index[2] + 0.5) * 4 - 2  # 车道宽度为4
-            self.target_heading = self.lane.heading_at(self.position[0])  # 目标车道的航向
-            self.is_changing_lane = True  # 标记正在换道
-            self.lane_index = new_lane_index
-            self.lane = self.road.network.get_lane(self.lane_index)
-
-        # 换道过程平滑处理
-        if self.is_changing_lane:
-            # 逐步调整位置和车头方向
-            delta_y = (self.target_lane_center_y - self.position[1]) * 0.4  # 小步移动
-            self.position[1] += delta_y
-            delta_heading = (self.target_heading - self.heading) * 0.4  # 小步调整航向
-            self.heading += delta_heading
-            # 当接近目标位置和目标朝向时，结束换道过程
-            if abs(self.position[1] - self.target_lane_center_y) < 0.1 and abs(
-                    self.heading - self.target_heading) < 0.1:
-                self.position[1] = self.target_lane_center_y
-                self.heading = self.target_heading
-                self.is_changing_lane = False  # 换道完成
         # 调用状态更新
         self.collect_jerk_message(dt)
         # 调用状态更新
         self.on_state_update()
 
-    def collect_jerk_message(self, dt):
-        # 计算当前时刻的横向和纵向加速度
-        current_acceleration_x = self.action["acceleration"] * np.cos(self.heading)
-        current_acceleration_y = self.action["acceleration"] * np.sin(self.heading)
-        # 计算横向和纵向加加速度（jerk），jerk = 加速度的变化 / 时间差
-        jerk_x = (current_acceleration_x - self.previous_acceleration_x) / dt
-        jerk_y = (current_acceleration_y - self.previous_acceleration_y) / dt
-        # 更新前一时刻的加速度值
-        self.previous_acceleration_x = current_acceleration_x
-        self.previous_acceleration_y = current_acceleration_y
-        # 输出当前横向和纵向的加加速度
-        self.jerk_x = jerk_x
-        self.jerk_y = jerk_y
-
-    @property
-    def get_jerk_x(self) -> float:
-        """返回当前的加加速度"""
-        return self.jerk_x
-
-    @property
-    def get_jerk_y(self) -> float:
-        """返回当前的加加速度"""
-        return self.jerk_y
-
-    @property
-    def get_verb_x(self) -> float:
-        """获取规划此刻的横向速度"""
-        return self.velocity[0]
-
-    @property
-    def get_verb_y(self) -> float:
-        """获取此刻的纵向速度"""
-        return self.velocity[1]
-
-    def clip_actions(self) -> None:
-        if self.crashed:
-            self.action["steering"] = 0
-            self.action["acceleration"] = -1.0 * self.speed
-        self.action["steering"] = float(self.action["steering"])
-        self.action["acceleration"] = float(self.action["acceleration"])
-        if self.speed > self.MAX_SPEED:
-            self.action["acceleration"] = min(
-                self.action["acceleration"], 1.0 * (self.MAX_SPEED - self.speed)
-            )
-        elif self.speed < self.MIN_SPEED:
-            self.action["acceleration"] = max(
-                self.action["acceleration"], 1.0 * (self.MIN_SPEED - self.speed)
-            )
-
     def on_state_update(self) -> None:
         if self.road:
-            self.lane_index = self.road.network.get_closest_lane_index(
-                self.position, self.heading
-            )
-            self.lane = self.road.network.get_lane(self.lane_index)
+            new_lane_index = self.road.network.get_closest_lane_index(self.position, self.heading)
+            # if self.is_observed:
+            #     ray.logger.info(f"当前车道{self.lane_index[2]}---目标车道{new_lane_index[2]}")
+            # # 检查是否需要更改车道
+            if new_lane_index[2] != self.lane_index[2] and not self.is_changing_lane:
+                # 设置换道目标位置
+                self.target_lane_center_y = (new_lane_index[2] + 0.5) * 4 - 2  # 车道宽度为4
+                self.target_heading = self.lane.heading_at(self.position[0])  # 目标车道的航向
+                self.is_changing_lane = True  # 标记正在换道
+                self.lane_index = new_lane_index
+                self.lane = self.road.network.get_lane(self.lane_index)
+            #
+            # # 换道过程平滑处理
+            if self.is_changing_lane:
+                # 逐步调整位置和车头方向
+                delta_y = (self.target_lane_center_y - self.position[1]) * 0.4  # 小步移动
+                self.position[1] += delta_y
+                delta_heading = (self.target_heading - self.heading) * 0.4  # 小步调整航向
+                self.heading += delta_heading
+                # 当接近目标位置和目标朝向时，结束换道过程
+                if abs(self.position[1] - self.target_lane_center_y) < 0.1 and abs(
+                        self.heading - self.target_heading) < 0.1:
+                    self.position[1] = self.target_lane_center_y
+                    self.heading = self.target_heading
+                    self.is_changing_lane = False  # 换道完成
             if self.road.record_history:
                 self.history.appendleft(self.create_from(self))
 
@@ -563,14 +511,6 @@ class Vehicle(RoadObject):
                 d[key] -= origin_dict[key]
         return d
 
-    def __str__(self):
-        return "{} #{}: {}".format(
-            self.__class__.__name__, id(self) % 1000, self.position
-        )
-
-    def __repr__(self):
-        return self.__str__()
-
     def predict_trajectory(
             self,
             actions: list,
@@ -598,3 +538,60 @@ class Vehicle(RoadObject):
                 if (t % int(trajectory_timestep / dt)) == 0:
                     states.append(copy.deepcopy(v))
         return states
+
+    def collect_jerk_message(self, dt):
+        # 计算当前时刻的横向和纵向加速度
+        current_acceleration_x = self.action["acceleration"] * np.cos(self.heading)
+        current_acceleration_y = self.action["acceleration"] * np.sin(self.heading)
+        # 计算横向和纵向加加速度（jerk），jerk = 加速度的变化 / 时间差
+        jerk_x = (current_acceleration_x - self.previous_acceleration_x) / dt
+        jerk_y = (current_acceleration_y - self.previous_acceleration_y) / dt
+        # 更新前一时刻的加速度值
+        self.previous_acceleration_x = current_acceleration_x
+        self.previous_acceleration_y = current_acceleration_y
+        # 输出当前横向和纵向的加加速度
+        self.jerk_x = jerk_x
+        self.jerk_y = jerk_y
+
+    @property
+    def get_jerk_x(self) -> float:
+        """返回当前的加加速度"""
+        return self.jerk_x
+
+    @property
+    def get_jerk_y(self) -> float:
+        """返回当前的加加速度"""
+        return self.jerk_y
+
+    @property
+    def get_verb_x(self) -> float:
+        """获取规划此刻的横向速度"""
+        return self.velocity[0]
+
+    @property
+    def get_verb_y(self) -> float:
+        """获取此刻的纵向速度"""
+        return self.velocity[1]
+
+    def __str__(self):
+        return "{} #{}: {}".format(
+            self.__class__.__name__, id(self) % 1000, self.position
+        )
+
+    def __repr__(self):
+        return self.__str__()
+
+    def clip_actions(self) -> None:
+        if self.crashed:
+            self.action["steering"] = 0
+            self.action["acceleration"] = -1.0 * self.speed
+        self.action["steering"] = float(self.action["steering"])
+        self.action["acceleration"] = float(self.action["acceleration"])
+        if self.speed > self.MAX_SPEED:
+            self.action["acceleration"] = min(
+                self.action["acceleration"], 1.0 * (self.MAX_SPEED - self.speed)
+            )
+        elif self.speed < self.MIN_SPEED:
+            self.action["acceleration"] = max(
+                self.action["acceleration"], 1.0 * (self.MIN_SPEED - self.speed)
+            )
