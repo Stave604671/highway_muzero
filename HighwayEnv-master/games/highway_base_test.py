@@ -143,8 +143,8 @@ class Game(AbstractGame):
                                 'action': {'type': 'ContinuousAction',
                                            'acceleration_range': (-4, 4.0),
                                            'steering_range': (-np.pi / 12, np.pi / 12)},  # 为它扩展一个能够控制横向加速度和纵向加速度的子类
-                                'simulation_frequency': 10,  # 模拟频率
-                                'policy_frequency': 10,  # 策略频率
+                                'simulation_frequency': 24,  # 模拟频率
+                                'policy_frequency': 24,  # 策略频率
                                 # 纵向决策：IDM（智能驾驶模型）根据前车的距离和速度计算出加速度。
                                 'other_vehicles_type': 'highway_env.vehicle.behavior.IDMVehicle',
                                 'screen_width': 900,  # 屏幕宽度
