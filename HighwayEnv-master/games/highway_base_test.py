@@ -29,7 +29,7 @@ class MuZeroConfig:
         self.num_workers = 1  # 定义了同时进行 Self-Play 的工作线程数量，这些线程负责生成训练样本并将其存储到回放缓冲区中。
         self.selfplay_on_gpu = True  # 是否在gpu进行自我博弈,打开后速度变快,但是显存开支会高很多
         self.max_moves = 500  # 每场游戏的最大游戏次数,未发生碰撞,或者没有达到这个次数,单场游戏都不停止
-        self.num_simulations = 30  # 执行指定次数的模拟，每次模拟从根节点开始进行搜索和更新,
+        self.num_simulations = 50  # 执行指定次数的模拟，每次模拟从根节点开始进行搜索和更新,
         self.discount = 0.997  # 长期回报的折扣因子
         self.temperature_threshold = None  # 单次play_games的温度阈值,当前的play_games内,最大移动self.max_moves次,moves的次数超过这个阈值后,温度直接为0,低于这个次数时,启用visit_softmax_temperature_fn获取温度数值
         # 'uniform' or 'density'
@@ -143,8 +143,8 @@ class Game(AbstractGame):
                                 'action': {'type': 'ContinuousAction',
                                            'acceleration_range': (-4, 4.0),
                                            'steering_range': (-np.pi / 12, np.pi / 12)},  # 为它扩展一个能够控制横向加速度和纵向加速度的子类
-                                'simulation_frequency': 24,  # 模拟频率
-                                'policy_frequency': 24,  # 策略频率
+                                'simulation_frequency': 10,  # 模拟频率
+                                'policy_frequency': 10,  # 策略频率
                                 # 纵向决策：IDM（智能驾驶模型）根据前车的距离和速度计算出加速度。
                                 'other_vehicles_type': 'highway_env.vehicle.behavior.IDMVehicle',
                                 'screen_width': 900,  # 屏幕宽度
