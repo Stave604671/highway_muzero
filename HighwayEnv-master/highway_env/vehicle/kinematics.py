@@ -194,6 +194,7 @@ class Vehicle(RoadObject):
             is_observed: bool = False
     ):
         super().__init__(road, position, heading, speed)
+        self.new_position = None
         self.target_heading = None
         self.target_lane_center_y = None
         self.jerk_y = None
@@ -202,10 +203,14 @@ class Vehicle(RoadObject):
         self.previous_acceleration_x = 0
         self.prediction_type = prediction_type
         self.action: dict[str, Union[float, np.ndarray]] = {"steering": 0.0, "acceleration": 0.0}
+        self.action_recent: dict[str, Union[float, np.ndarray]] = {"steering": 0.0, "acceleration": 0.0}
+        self.position_recent = None
         self.crashed = False
         self.is_observed = is_observed
         self.is_changing_lane = None
         self.impact = None
+        self.heading_recent = None
+        self.speed_recent = None
         self.log = []
         self.history = deque(maxlen=self.HISTORY_SIZE)
         self.acceleration1 = 0.0
@@ -348,6 +353,10 @@ class Vehicle(RoadObject):
         Propagate the vehicle state given its actions.
         """
         # 使用LQR平滑角度
+        self.action_recent = copy.deepcopy(self.action)
+        self.position_recent = copy.deepcopy(self.position)
+        self.speed_recent = copy.deepcopy(self.speed)
+        self.heading_recent = copy.deepcopy(self.heading)
         if self.is_observed:
             steering_control = self.lqr_compute(dt, self.action['steering'])
             self.action["steering"] = np.clip(steering_control,
@@ -362,25 +371,28 @@ class Vehicle(RoadObject):
                 self.action["acceleration"] + self.MAX_ACC_CHANGE
             )
             # ray.logger.info(f"车速{self.speed}。目标航向{self.target_heading} 所属车道{self.lane_index[2]}此时转向角:{self.action['steering']}")
-            obstacles = self.get_nearby_obstacles()  # 获取障碍物
+            # obstacles = self.get_nearby_obstacles()  # 获取障碍物
             # if obstacles:
             # ray.logger.info(f"前方存在障碍物。此时转向角:{self.action['steering']}")
             if self.lane_index[2] == 3 and self.action['steering'] > 0:  # 避免向左转，保持直行或向右
                 self.action['steering'] = - self.action['steering']
             elif self.lane_index[2] == 0 and self.action['steering'] < 0:  # 避免向左转，保持直行或向右
                 self.action['steering'] = -self.action['steering']
-            if not obstacles:
-                self.action['steering'] = 0
             # else:
             #     self.action["steering"] = 0
-        else:
-            self.action['steering'] = 0
+        # else:
+        #     self.action['steering'] = 0
         self.clip_actions()
-
         delta_f = self.action["steering"]
         beta = np.arctan(1 / 2 * np.tan(delta_f))
         v = self.speed * np.array([np.cos(self.heading + beta), np.sin(self.heading + beta)])
         self.position += v * dt
+        # 不使用控制器获取车辆更新后的坐标
+        beta1 = np.arctan(1 / 2 * np.tan(self.action_recent["steering"]))
+        v = self.speed_recent * np.array([np.cos(self.heading_recent + beta1),
+                                          np.sin(self.heading_recent + beta1)])
+        self.new_position = copy.deepcopy(self.position_recent)
+        self.new_position += v * dt
 
         if self.impact is not None:
             self.position += self.impact

@@ -7,7 +7,6 @@ import pickle
 import sys
 import time
 
-import nevergrad
 import numpy
 import ray
 import torch
@@ -479,95 +478,6 @@ class CPUActor:
         return weigths, summary
 
 
-def hyperparameter_search(
-    game_name, parametrization, budget, parallel_experiments, num_tests
-):
-    """
-    Search for hyperparameters by launching parallel experiments.
-
-    Args:
-        game_name (str): Name of the game module, it should match the name of a .py file
-        in the "./games" directory.
-
-        parametrization : Nevergrad parametrization, please refer to nevergrad documentation.
-
-        budget (int): Number of experiments to launch in total.
-
-        parallel_experiments (int): Number of experiments to launch in parallel.
-
-        num_tests (int): Number of games to average for evaluating an experiment.
-    """
-    optimizer = nevergrad.optimizers.OnePlusOne(
-        parametrization=parametrization, budget=budget
-    )
-
-    running_experiments = []
-    best_training = None
-    try:
-        # Launch initial experiments
-        for i in range(parallel_experiments):
-            if 0 < budget:
-                param = optimizer.ask()
-                print(f"Launching new experiment: {param.value}")
-                muzero = MuZero(game_name, param.value, parallel_experiments)
-                muzero.param = param
-                muzero.train(False)
-                running_experiments.append(muzero)
-                budget -= 1
-
-        while 0 < budget or any(running_experiments):
-            for i, experiment in enumerate(running_experiments):
-                if experiment and experiment.config.training_steps <= ray.get(
-                    experiment.shared_storage_worker.get_info.remote("training_step")
-                ):
-                    experiment.terminate_workers()
-                    result = experiment.test(False, num_tests=num_tests)
-                    if not best_training or best_training["result"] < result:
-                        best_training = {
-                            "result": result,
-                            "config": experiment.config,
-                            "checkpoint": experiment.checkpoint,
-                        }
-                    print(f"Parameters: {experiment.param.value}")
-                    print(f"Result: {result}")
-                    optimizer.tell(experiment.param, -result)
-
-                    if 0 < budget:
-                        param = optimizer.ask()
-                        print(f"Launching new experiment: {param.value}")
-                        muzero = MuZero(game_name, param.value, parallel_experiments)
-                        muzero.param = param
-                        muzero.train(False)
-                        running_experiments[i] = muzero
-                        budget -= 1
-                    else:
-                        running_experiments[i] = None
-
-    except KeyboardInterrupt:
-        for experiment in running_experiments:
-            if isinstance(experiment, MuZero):
-                experiment.terminate_workers()
-
-    recommendation = optimizer.provide_recommendation()
-    print("Best hyperparameters:")
-    print(recommendation.value)
-    if best_training:
-        # Save best training weights (but it's not the recommended weights)
-        best_training["config"].results_path.mkdir(parents=True, exist_ok=True)
-        torch.save(
-            best_training["checkpoint"],
-            best_training["config"].results_path / "model.checkpoint",
-        )
-        # Save the recommended hyperparameters
-        text_file = open(
-            best_training["config"].results_path / "best_parameters.txt",
-            "w",
-        )
-        text_file.write(str(recommendation.value))
-        text_file.close()
-    return recommendation.value
-
-
 def load_model_menu(muzero, game_name):
     # Configure running options
     options = ["Specify paths manually"] + sorted(
@@ -677,20 +587,20 @@ if __name__ == "__main__":
                     observation, reward, done = env.step(action)
                     print(f"\nAction: {env.action_to_string(action)}\nReward: {reward}")
                     env.render()
-            elif choice == 5:
-                # Define here the parameters to tune
-                # Parametrization documentation: https://facebookresearch.github.io/nevergrad/parametrization.html
-                muzero.terminate_workers()
-                del muzero
-                budget = 20
-                parallel_experiments = 2
-                lr_init = nevergrad.p.Log(lower=0.0001, upper=0.1)
-                discount = nevergrad.p.Log(lower=0.95, upper=0.9999)
-                parametrization = nevergrad.p.Dict(lr_init=lr_init, discount=discount)
-                best_hyperparameters = hyperparameter_search(
-                    game_name, parametrization, budget, parallel_experiments, 20
-                )
-                muzero = MuZero(game_name, best_hyperparameters)
+            # elif choice == 5:
+            #     # Define here the parameters to tune
+            #     # Parametrization documentation: https://facebookresearch.github.io/nevergrad/parametrization.html
+            #     muzero.terminate_workers()
+            #     del muzero
+            #     budget = 20
+            #     parallel_experiments = 2
+            #     lr_init = nevergrad.p.Log(lower=0.0001, upper=0.1)
+            #     discount = nevergrad.p.Log(lower=0.95, upper=0.9999)
+            #     parametrization = nevergrad.p.Dict(lr_init=lr_init, discount=discount)
+            #     best_hyperparameters = hyperparameter_search(
+            #         game_name, parametrization, budget, parallel_experiments, 20
+            #     )
+            #     muzero = MuZero(game_name, best_hyperparameters)
             else:
                 break
             print("\nDone")
