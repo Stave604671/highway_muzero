@@ -16,7 +16,7 @@ class MuZeroConfig:
         self.max_num_gpus = None  # 固定使用gpu的最大数量.使用单个gpu会更快,没有配置的话会默认使用所有gpu
 
         # Game
-        self.observation_shape = (1, 21, 3)  # 游戏观测空间的维度,如果观测空间三维无所谓,如果是一维,需要配成(1,1,x)
+        self.observation_shape = (1, 30, 5)  # 游戏观测空间的维度,如果观测空间三维无所谓,如果是一维,需要配成(1,1,x)
         self.action_space = 2  # 动作空间的大小
         self.players = [i for i in range(1)]  # 玩家的数量,车辆换道场景观测和控制车辆只有一个,为1就行
         self.stacked_observations = 0  # 观测时叠加的历史观察数量（包括过去的动作）。
@@ -31,7 +31,7 @@ class MuZeroConfig:
         self.max_moves = 500  # 每场游戏的最大游戏次数,未发生碰撞,或者没有达到这个次数,单场游戏都不停止
         self.num_simulations = 50  # 执行指定次数的模拟，每次模拟从根节点开始进行搜索和更新,
         self.discount = 0.997  # 长期回报的折扣因子
-        self.temperature_threshold = None  # 单次play_games的温度阈值,当前的play_games内,最大移动self.max_moves次,moves的次数超过这个阈值后,温度直接为0,低于这个次数时,启用visit_softmax_temperature_fn获取温度数值
+        self.temperature_threshold = True  # 单次play_games的温度阈值,当前的play_games内,最大移动self.max_moves次,moves的次数超过这个阈值后,温度直接为0,低于这个次数时,启用visit_softmax_temperature_fn获取温度数值
         # 'uniform' or 'density'
         self.node_prior = 'uniform'
 
@@ -68,9 +68,10 @@ class MuZeroConfig:
         self.batch_size = 512  # Number of parts of games to train on at each training step
         # 多少轮保存一次数据
         self.checkpoint_interval = 10  # Number of training steps before using the model for self-playing
-        self.value_loss_weight = 1.5  # 缩放value loss避免过拟合,论文参数是0.25,直接给到五倍好了
-        self.entropy_loss_weight = 0.5  # 缩放entropy_loss
+        self.value_loss_weight = 2  # 缩放value loss避免过拟合,论文参数是0.25,直接给到五倍好了
+        self.entropy_loss_weight = 1  # 缩放entropy_loss
         self.reward_loss_weight = 3
+        self.policy_loss_weight = 2
         self.train_on_gpu = torch.cuda.is_available()  # Train on GPU if available
         self.optimizer = "AdamW"  # "Adam" or "SGD". Paper uses SGD
         self.weight_decay = 1e-4  # L2 weights regularization
@@ -89,7 +90,7 @@ class MuZeroConfig:
         self.td_steps = 75  # Number of steps in the future to take into account for calculating the target value
 
         self.PER = True  # Prioritized Replay (See paper appendix Training), select in priority the elements in the replay buffer which are unexpected for the network
-        self.PER_alpha = 0.6  # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
+        self.PER_alpha = 1.0  # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
 
         # Reanalyze (See paper appendix Reanalyse)
         self.use_last_model_value = True  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
@@ -126,8 +127,8 @@ class Game(AbstractGame):
         self.env = gym.make('highway-fast-v0', render_mode="rgb_array",
                             config={  # 需要在程序启动这个观测器之前使用自定义的公式来对观测车辆的初始速度和初始位置进行初始化
                                 'observation': {"type": "Kinematics",  # 使用这个观测器作为状态空间，可以获取观测车辆位置、观测车辆速度和观测车辆转向角
-                                                "vehicles_count": 21,  # 20辆周围车辆
-                                                "features": ["presence", "x", "y"],
+                                                "vehicles_count": 30,  # 20辆周围车辆
+                                                "features": ["presence", "x", "y", "vx", "vy"],
                                                 # "features_range": {
                                                 #     # "x": [-100, 100],
                                                 #     # "y": [-100, 100],
@@ -166,7 +167,7 @@ class Game(AbstractGame):
                                 "right_lane_reward": 1,  # 在最右边的车道上行驶时获得的奖励，在其他车道上线性映射为零。
                                 'collision_reward': -2.5,  # 与车辆相撞时获取的惩罚
                                 'high_speed_reward': 5,    # 维持高速行驶的奖励
-                                'lane_change_reward': -1.5,  # 换道的惩罚
+                                'lane_change_reward': 0,  # 换道的惩罚
                                 'reward_speed_range': [20, 30],  # 高速的奖励从这个范围线性映射到[0,HighwayEnv.HIGH_SPEED_REWARD]。
                                 'offroad_terminal': True  # 车辆偏离道路是否会导致仿真结束
                             })
@@ -205,7 +206,7 @@ class Game(AbstractGame):
 
         # Reshape the observation to 3D (1, 1, -1)
         observation = np.array(observation)
-        observation = observation.reshape((1, 21, 3))
+        observation = observation.reshape((1, 30, 5))
         # logger.info(f"Observation2 reset shape after step:{type(observation)}-shape-{observation.shape}")
         return observation
 

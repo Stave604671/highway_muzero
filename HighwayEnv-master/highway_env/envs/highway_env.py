@@ -104,6 +104,10 @@ class HighwayEnv(AbstractEnv):
         :return: the corresponding reward
         """
         rewards = self._rewards(action)
+        if rewards['lane_change_reward']:
+            ray.logger.info(f"车辆在尝试脱轨而得到了惩罚{self.config['lane_change_reward']}:{rewards['lane_change_reward']}")
+        if rewards['collision_reward']:
+            ray.logger.info(f"车辆在发生碰撞而得到了惩罚{self.config['collision_reward']}:{rewards['collision_reward']}")
         reward = sum(
             self.config.get(name, 0) * reward for name, reward in rewards.items()
         )
@@ -111,7 +115,7 @@ class HighwayEnv(AbstractEnv):
             reward = utils.lmap(
                 reward,
                 [
-                    self.config["collision_reward"] +  self.config["lane_change_reward"],
+                    self.config["collision_reward"] + self.config["lane_change_reward"],
                     self.config["high_speed_reward"] + self.config["right_lane_reward"],
                 ],
                 [0, 1],

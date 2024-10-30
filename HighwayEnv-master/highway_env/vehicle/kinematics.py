@@ -353,12 +353,11 @@ class Vehicle(RoadObject):
                 self.action_recent["acceleration"] - self.MAX_ACC_CHANGE,
                 self.action_recent["acceleration"] + self.MAX_ACC_CHANGE
             )
-            # if obstacles:
             # ray.logger.info(f"前方存在障碍物。此时转向角:{self.action['steering']}")
-            if self.lane_index[2] == 3 and self.action['steering'] > 0:  # 避免向左转，保持直行或向右
-                self.action['steering'] = - self.action['steering']
-            elif self.lane_index[2] == 0 and self.action['steering'] < 0:  # 避免向左转，保持直行或向右
-                self.action['steering'] = -self.action['steering']
+            obstacles = self.get_nearby_obstacles()
+            if not obstacles:
+                self.action["steering"] = 0
+                self.action_recent["steering"] = 0
             # else:
             #     self.action["steering"] = 0
         else:
@@ -586,6 +585,10 @@ class Vehicle(RoadObject):
             self.action["acceleration"] = -1.0 * self.speed
         self.action["steering"] = float(self.action["steering"])
         self.action["acceleration"] = float(self.action["acceleration"])
+        if self.lane_index[2] == 3 and self.action['steering'] > 0:  # 避免向左转，保持直行或向右
+            self.action['steering'] = - self.action['steering']
+        elif self.lane_index[2] == 0 and self.action['steering'] < 0:  # 避免向左转，保持直行或向右
+            self.action['steering'] = -self.action['steering']
         if self.speed > self.MAX_SPEED:
             self.action["acceleration"] = min(
                 self.action["acceleration"], 1.0 * (self.MAX_SPEED - self.speed)
