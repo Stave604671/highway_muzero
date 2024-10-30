@@ -133,11 +133,10 @@ class HighwayEnv(AbstractEnv):
         )
         # 更新 last_lane_index
         self.vehicle.last_lane_index = self.vehicle.lane_index[2]
-
         return {
             "collision_reward": float(self.vehicle.crashed),
             "right_lane_reward": lane / max(len(neighbours) - 1, 1),
-            "lane_change_reward": self.config["lane_change_reward"] if self.vehicle.get_jerk_x > 2 or self.vehicle.get_jerk_y > 2 else 0,
+            "lane_change_reward": -self.config["lane_change_reward"] if (isinstance(self.vehicle.get_jerk_x, (int, float)) and self.vehicle.get_jerk_x > 2) or (isinstance(self.vehicle.get_jerk_y, (int, float)) and self.vehicle.get_jerk_y > 2) else 0,
             "high_speed_reward": np.clip(scaled_speed, 0, 1),
             "on_road_reward": float(self.vehicle.on_road),
         }
