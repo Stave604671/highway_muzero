@@ -43,7 +43,7 @@ def normalize_angle(angle):
 
 
 class DynamicReferencePath:
-    def __init__(self, length=30, num_points=300, lane_width=4, safety_distance=2.5):
+    def __init__(self, length=10, num_points=100, lane_width=4, safety_distance=2.5):
         self.length = length  # 参考路径的长度
         self.num_points = num_points  # 参考路径的点数
         self.lane_width = lane_width  # 车道宽度
@@ -70,27 +70,6 @@ class DynamicReferencePath:
             if i > 0:
                 curvature = dy / (dx ** 2 + dy ** 2) ** (3 / 2)
                 self.refer_path[i, 3] = curvature  # 曲率k
-
-        # 避障逻辑
-        for vehicle in vehicles:
-            vx, vy = vehicle.position  # 获取车辆的当前位置
-            # 计算与参考路径的距离并调整
-            for j in range(self.num_points):
-                dist = np.sqrt((self.refer_path[j, 0] - vx) ** 2 + (self.refer_path[j, 1] - vy) ** 2)
-                if dist < self.lane_width / 2 + self.safety_distance:  # 如果距离小于车道宽度加安全距离
-                    # 调整参考路径
-                    shift = self.lane_width / 2 + self.safety_distance - dist
-                    # 计算路径调整量，基于距离和震荡因子
-                    if dist < self.lane_width / 2:  # 距离非常近
-                        adjustment_factor = 0.5  # 完全调整
-                    else:  # 距离稍远
-                        adjustment_factor = 0.01  # 减少调整幅度
-                    # 限制最大调整幅度
-                    max_shift = 1.0  # 可以根据需求调整最大限制
-                    shift = min(shift * adjustment_factor, max_shift)
-                    angle = self.refer_path[j, 2] + np.pi / 2  # 计算垂直于路径的方向
-                    self.refer_path[j, 0] += shift * np.cos(angle)
-                    self.refer_path[j, 1] += shift * np.sin(angle)
 
     def calc_track_error(self, x, y):
         """Calculate tracking error.
@@ -195,6 +174,7 @@ class Vehicle(RoadObject):
     ):
         super().__init__(road, position, heading, speed)
         self.new_position = None
+        self.dt = None
         self.target_heading = None
         self.target_lane_center_y = None
         self.jerk_y = None
@@ -216,7 +196,7 @@ class Vehicle(RoadObject):
         self.acceleration1 = 0.0
         self.previous_acceleration = 0.0  # 前一时刻的加速度
         self.jerk = 0.0  # 当前加加速度
-        self.pid_controller_acceleration = pid_acceleration if pid_acceleration else PIDController(3, 0.05, 0.2)
+        self.pid_controller_acceleration = pid_acceleration if pid_acceleration else PIDController(0.5, 0.1, 0.4)
         self.dy_ref_path = DynamicReferencePath()
         self.lqr_controller = LQRController()
 
@@ -353,6 +333,7 @@ class Vehicle(RoadObject):
         Propagate the vehicle state given its actions.
         """
         # 使用LQR平滑角度
+        self.dt = dt
         self.action_recent = copy.deepcopy(self.action)
         self.position_recent = copy.deepcopy(self.position)
         self.speed_recent = copy.deepcopy(self.speed)
@@ -370,8 +351,6 @@ class Vehicle(RoadObject):
                 self.action["acceleration"] - self.MAX_ACC_CHANGE,
                 self.action["acceleration"] + self.MAX_ACC_CHANGE
             )
-            # ray.logger.info(f"车速{self.speed}。目标航向{self.target_heading} 所属车道{self.lane_index[2]}此时转向角:{self.action['steering']}")
-            # obstacles = self.get_nearby_obstacles()  # 获取障碍物
             # if obstacles:
             # ray.logger.info(f"前方存在障碍物。此时转向角:{self.action['steering']}")
             if self.lane_index[2] == 3 and self.action['steering'] > 0:  # 避免向左转，保持直行或向右
@@ -408,7 +387,6 @@ class Vehicle(RoadObject):
             self.target_lane_center_y = None
         # 调用状态更新
         self.collect_jerk_message(dt)
-        # 调用状态更新
         self.on_state_update()
 
     def on_state_update(self) -> None:
@@ -432,9 +410,10 @@ class Vehicle(RoadObject):
                 self.position[1] += delta_y
                 delta_heading = (self.target_heading - self.heading) * 0.4  # 小步调整航向
                 self.heading += delta_heading
+                self.lane_index = new_lane_index
+                self.lane = self.road.network.get_lane(self.lane_index)
                 # 当接近目标位置和目标朝向时，结束换道过程
-                if abs(self.position[1] - self.target_lane_center_y) < 0.1 and abs(
-                        self.heading - self.target_heading) < 0.1:
+                if abs(self.position[1] - self.target_lane_center_y) < 0.1:
                     self.position[1] = self.target_lane_center_y
                     self.heading = self.target_heading
                     self.is_changing_lane = False  # 换道完成
@@ -557,15 +536,18 @@ class Vehicle(RoadObject):
         # 计算当前时刻的横向和纵向加速度
         current_acceleration_x = self.action["acceleration"] * np.cos(self.heading)
         current_acceleration_y = self.action["acceleration"] * np.sin(self.heading)
+        # 前一时刻的横向加速度和纵向加速度
+        previous_acceleration_x = self.action_recent["acceleration"] * np.cos(self.heading_recent)
+        previous_acceleration_y = self.action_recent["acceleration"] * np.sin(self.heading_recent)
         # 计算横向和纵向加加速度（jerk），jerk = 加速度的变化 / 时间差
-        jerk_x = (current_acceleration_x - self.previous_acceleration_x) / dt
-        jerk_y = (current_acceleration_y - self.previous_acceleration_y) / dt
-        # 更新前一时刻的加速度值
-        self.previous_acceleration_x = current_acceleration_x
-        self.previous_acceleration_y = current_acceleration_y
-        # 输出当前横向和纵向的加加速度
-        self.jerk_x = jerk_x
-        self.jerk_y = jerk_y
+        ray.logger.info(f"jerk_x: {current_acceleration_x} out {previous_acceleration_x}时间{dt}加速度差{previous_acceleration_x-current_acceleration_x}")
+        ray.logger.info(f"jerk_y: {current_acceleration_y}  out {previous_acceleration_y}时间{dt}加速度差{previous_acceleration_y-current_acceleration_y}")
+
+        self.jerk_x = (current_acceleration_x - previous_acceleration_x) / dt
+        self.jerk_y = (current_acceleration_y - previous_acceleration_y) / dt
+        if self.jerk_y > 2 or self.jerk_x > 2:
+            ray.logger.info(
+                f"超标jerk：{self.speed} {self.action}  {self.action_recent}jerk_y: {current_acceleration_y}  out {previous_acceleration_y}时间{dt}加速度差{previous_acceleration_y - current_acceleration_y}")
 
     @property
     def get_jerk_x(self) -> float:
