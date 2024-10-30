@@ -111,7 +111,7 @@ class HighwayEnv(AbstractEnv):
             reward = utils.lmap(
                 reward,
                 [
-                    self.config["collision_reward"],
+                    self.config["collision_reward"] +  self.config["lane_change_reward"],
                     self.config["high_speed_reward"] + self.config["right_lane_reward"],
                 ],
                 [0, 1],
@@ -137,6 +137,7 @@ class HighwayEnv(AbstractEnv):
         return {
             "collision_reward": float(self.vehicle.crashed),
             "right_lane_reward": lane / max(len(neighbours) - 1, 1),
+            "lane_change_reward": self.config["lane_change_reward"] if self.vehicle.get_jerk_x > 2 or self.vehicle.get_jerk_y > 2 else 0,
             "high_speed_reward": np.clip(scaled_speed, 0, 1),
             "on_road_reward": float(self.vehicle.on_road),
         }

@@ -159,7 +159,7 @@ class Vehicle(RoadObject):
     """ Minimum reachable speed [m/s] """
     HISTORY_SIZE = 30
     """ Length of the vehicle state history, for trajectory display"""
-    MAX_STEERING_CHANGE = 0.1
+    MAX_STEERING_CHANGE = 0.01
     MAX_ACC_CHANGE = 0.01
 
     def __init__(
@@ -333,6 +333,8 @@ class Vehicle(RoadObject):
         Propagate the vehicle state given its actions.
         """
         # 使用LQR平滑角度
+        self.clip_actions()
+
         self.dt = dt
         self.action_recent = copy.deepcopy(self.action)
         self.position_recent = copy.deepcopy(self.position)
@@ -348,8 +350,8 @@ class Vehicle(RoadObject):
             # 限制变化量
             self.action["acceleration"] = np.clip(
                 acceleration_control,
-                self.action["acceleration"] - self.MAX_ACC_CHANGE,
-                self.action["acceleration"] + self.MAX_ACC_CHANGE
+                self.action_recent["acceleration"] - self.MAX_ACC_CHANGE,
+                self.action_recent["acceleration"] + self.MAX_ACC_CHANGE
             )
             # if obstacles:
             # ray.logger.info(f"前方存在障碍物。此时转向角:{self.action['steering']}")
@@ -361,7 +363,6 @@ class Vehicle(RoadObject):
             #     self.action["steering"] = 0
         # else:
         #     self.action['steering'] = 0
-        self.clip_actions()
         delta_f = self.action["steering"]
         beta = np.arctan(1 / 2 * np.tan(delta_f))
         v = self.speed * np.array([np.cos(self.heading + beta), np.sin(self.heading + beta)])
@@ -534,20 +535,22 @@ class Vehicle(RoadObject):
 
     def collect_jerk_message(self, dt):
         # 计算当前时刻的横向和纵向加速度
-        current_acceleration_x = self.action["acceleration"] * np.cos(self.heading)
-        current_acceleration_y = self.action["acceleration"] * np.sin(self.heading)
+        current_acceleration_x = self.action["acceleration"] * np.cos(self.heading
+                                                                      + np.arctan(
+            1 / 2 * np.tan(self.action['steering'])))
+        current_acceleration_y = self.action["acceleration"] * np.sin(self.heading
+                                                                      + np.arctan(
+            1 / 2 * np.tan(self.action['steering'])))
         # 前一时刻的横向加速度和纵向加速度
-        previous_acceleration_x = self.action_recent["acceleration"] * np.cos(self.heading_recent)
-        previous_acceleration_y = self.action_recent["acceleration"] * np.sin(self.heading_recent)
+        previous_acceleration_x = self.action_recent["acceleration"] * np.cos(self.heading_recent +
+                                                                              + np.arctan(1 / 2 * np.tan(
+                                                                                  self.action_recent['steering'])))
+        previous_acceleration_y = self.action_recent["acceleration"] * np.sin(self.heading_recent +
+                                                                              + np.arctan(1 / 2 * np.tan(
+                                                                                  self.action_recent['steering'])))
         # 计算横向和纵向加加速度（jerk），jerk = 加速度的变化 / 时间差
-        ray.logger.info(f"jerk_x: {current_acceleration_x} out {previous_acceleration_x}时间{dt}加速度差{previous_acceleration_x-current_acceleration_x}")
-        ray.logger.info(f"jerk_y: {current_acceleration_y}  out {previous_acceleration_y}时间{dt}加速度差{previous_acceleration_y-current_acceleration_y}")
-
         self.jerk_x = (current_acceleration_x - previous_acceleration_x) / dt
         self.jerk_y = (current_acceleration_y - previous_acceleration_y) / dt
-        if self.jerk_y > 2 or self.jerk_x > 2:
-            ray.logger.info(
-                f"超标jerk：{self.speed} {self.action}  {self.action_recent}jerk_y: {current_acceleration_y}  out {previous_acceleration_y}时间{dt}加速度差{previous_acceleration_y - current_acceleration_y}")
 
     @property
     def get_jerk_x(self) -> float:
