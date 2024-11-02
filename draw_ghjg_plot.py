@@ -13,8 +13,8 @@ def get_observed_vehicle_road_change(game_history):
     """
     state_road_idx = -1
     state_collect = []
-    for state_idx, vehicle_states in enumerate(game_history.observation_history):
-        observed_vehicle_y_location = vehicle_states[0, 0, 2]
+    for state_idx, vehicle_states in enumerate(game_history.vehicle_history):
+        observed_vehicle_y_location = vehicle_states[0].position[1]
         if -2 < observed_vehicle_y_location < 2:  # 第0车道
             observed_vehicle_road_idx = 0
         elif 2 < observed_vehicle_y_location < 6:  # 第1车道

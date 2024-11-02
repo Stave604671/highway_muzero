@@ -355,9 +355,9 @@ class Vehicle(RoadObject):
             )
             # ray.logger.info(f"前方存在障碍物。此时转向角:{self.action['steering']}")
             obstacles = self.get_nearby_obstacles()
-            if not obstacles:
-                self.action["steering"] = 0
-                self.action_recent["steering"] = 0
+            # if not obstacles:
+            #     self.action["steering"] = 0
+            #     self.action_recent["steering"] = 0
             # else:
             #     self.action["steering"] = 0
         else:
