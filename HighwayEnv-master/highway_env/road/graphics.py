@@ -329,7 +329,7 @@ class RoadGraphics:
 
         for v in road.vehicles:
             VehicleGraphics.display(v, surface, offscreen=offscreen)
-            if v.is_observed:
+            if v.is_observed:  # 如果是观测车辆，渲染其规划路径
                 VehicleGraphics.display_reference_path(v, surface)
 
     @staticmethod

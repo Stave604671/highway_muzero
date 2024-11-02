@@ -287,6 +287,7 @@ class Trainer:
             )
 
         # Scale the value loss and the entropy loss
+        # 配置loss权重比例，这里影响很大，之前调试那个参数，虽然别的不满足要求，但是loss层面已经可以稳定收敛，慎重调整这里
         loss = (
             value_loss * self.config.value_loss_weight
             + reward_loss * getattr(self.config, "reward_loss_weight", 1.0)

@@ -30,6 +30,7 @@ class VehicleGraphics:
     @classmethod
     def display_reference_path(cls, vehicle, surface: WorldSurface) -> None:
         """
+        显示LQR算法产出的规划路径
         Display the reference path as yellow dots on the pygame surface.
 
         :param vehicle: The list of path points to be displayed

@@ -22,7 +22,7 @@ from highway_env.vehicle.kinematics import Vehicle
 Observation = TypeVar("Observation")
 
 
-class AbstractEnv(gym.Env):
+class AbstractEnv(gym.Env):  # 继承gym类创建训练环境
     """
     A generic environment for various tasks involving a vehicle driving on a road.
 
@@ -74,12 +74,12 @@ class AbstractEnv(gym.Env):
         self.reset()
 
     @property
-    def vehicle(self) -> Vehicle:
+    def vehicle(self) -> Vehicle:  # 获取观测车辆
         """First (default) controlled vehicle."""
         return self.controlled_vehicles[0] if self.controlled_vehicles else None
 
     @vehicle.setter
-    def vehicle(self, vehicle: Vehicle) -> None:
+    def vehicle(self, vehicle: Vehicle) -> None:  # 配置观测车辆
         """Set a unique controlled vehicle."""
         self.controlled_vehicles = [vehicle]
 
@@ -120,7 +120,7 @@ class AbstractEnv(gym.Env):
         )
         self.metadata["render_fps"] = video_real_time_ratio * frames_freq
 
-    def define_spaces(self) -> None:
+    def define_spaces(self) -> None:  # 定义运行空间，包括观测空间和动作空间
         """
         Set the types and spaces of observation and action from config.
         """
@@ -168,6 +168,7 @@ class AbstractEnv(gym.Env):
 
     def _info(self, obs: Observation, action: Action | None = None) -> dict:
         """
+        返回一个字典来汇总当前的状态
         Return a dictionary of additional information
 
         :param obs: current observation
@@ -192,6 +193,7 @@ class AbstractEnv(gym.Env):
         options: dict | None = None,
     ) -> tuple[Observation, dict]:
         """
+        重置环境用来初始化配置
         Reset the environment to it's initial configuration
 
         :param seed: The seed that is used to initialize the environment's PRNG
@@ -223,6 +225,7 @@ class AbstractEnv(gym.Env):
 
     def step(self, action: Action) -> tuple[Observation, float, bool, bool, dict]:
         """
+        接受来自外部环境的action，self_play代码里面的self.game.step(action.value)的下一个环节就是到这里
         Perform an action and step the environment dynamics.
 
         The action is executed by the ego-vehicle, and all other vehicles on the road performs their default behaviour
@@ -250,7 +253,8 @@ class AbstractEnv(gym.Env):
         return obs, reward, terminated, truncated, info
 
     def _simulate(self, action: Action | None = None) -> None:
-        """Perform several steps of simulation with constant action."""
+        """应用action来更新环境
+        Perform several steps of simulation with constant action."""
         frames = int(
             self.config["simulation_frequency"] // self.config["policy_frequency"]
         )
@@ -269,6 +273,7 @@ class AbstractEnv(gym.Env):
                 self.action_type.act(action)
 
             self.road.act()
+            # 对应HighwayEnv-master/highway_env/vehicle/kinematics.py的step方法，使用当前环境的刷新频率来更新道路中的对象的状态
             self.road.step(1 / self.config["simulation_frequency"])
             self.steps += 1
 

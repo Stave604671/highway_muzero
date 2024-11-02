@@ -68,6 +68,10 @@ class ReplayBuffer:
         return self.buffer
 
     def get_batch(self):
+        """
+        获取一个batch的训练数据
+        :return:
+        """
         (
             index_batch,
             observation_batch,

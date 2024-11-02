@@ -19,25 +19,36 @@ class SelfPlay:
         self.config = config
         self.game = Game(seed)
 
-        # Fix random generator seed
+        # 固定随机数种子
         numpy.random.seed(seed)
         torch.manual_seed(seed)
 
-        # Initialize the network
+        # 初始化当前先程下的网络
         self.model = models.MuZeroNetwork(self.config)
         self.model.set_weights(initial_checkpoint["weights"])
+        # 控制当前线程是否允许使用gpu
         self.model.to(torch.device("cuda" if self.config.selfplay_on_gpu else "cpu"))
+        # 默认将模型配置为验证状态，此时会自动禁用梯度更新
         self.model.eval()
 
     def continuous_self_play(self, shared_storage, replay_buffer, test_mode=False):
+        """
+        只要未碰撞就让代码持续训练
+        :param shared_storage:
+        :param replay_buffer:
+        :param test_mode:
+        :return:
+        """
         while ray.get(
             shared_storage.get_info.remote("training_step")
         ) < self.config.training_steps and not ray.get(
             shared_storage.get_info.remote("terminate")
         ):
+            # 使用缓存空间更新后的权重，来更新当前模型的权重
             self.model.set_weights(ray.get(shared_storage.get_info.remote("weights")))
-
+            # 如果是训练模式
             if not test_mode:
+                # 传递温度参数
                 game_history = self.play_game(
                     self.config.visit_softmax_temperature_fn(
                         trained_steps=ray.get(
@@ -49,11 +60,11 @@ class SelfPlay:
                     "self",
                     0,
                 )
-
+                # 在缓存空间存储当次game产出的数据
                 replay_buffer.save_game.remote(game_history, shared_storage)
 
             else:
-                # Take the best action (no exploration) in test mode
+                # 如果是测试模式，禁用温度参数
                 game_history = self.play_game(
                     0,
                     self.config.temperature_threshold,
@@ -62,7 +73,7 @@ class SelfPlay:
                     self.config.muzero_player,
                 )
 
-                # Save to the shared storage
+                # 存储当次测试产出的reward，也是后续绘制reward曲线的重要数据来源
                 shared_storage.set_info.remote(
                     {
                         "episode_length": len(game_history.action_history) - 1,
@@ -91,6 +102,8 @@ class SelfPlay:
                     )
 
             # Managing the self-play / training ratio
+            # 管理自我博弈和训练的比例，因为使用了多线程训练，所以只要在这里添加合适的延迟，
+            # 当前时刻下，系统能完成的自我博弈的次数和训练的次数就会受影响
             if not test_mode and self.config.self_play_delay:
                 time.sleep(self.config.self_play_delay)
             if not test_mode and self.config.ratio:
@@ -105,27 +118,29 @@ class SelfPlay:
                     and not ray.get(shared_storage.get_info.remote("terminate"))
                 ):
                     time.sleep(0.5)
-
+        # 用完game就关闭，好习惯
         self.close_game()
 
     def play_game(
         self, temperature, temperature_threshold, render, opponent, muzero_player
     ):
         """
+        单次运行game
         Play one game with actions based on the Monte Carlo tree search at each moves.
         """
         game_history = GameHistory()
+        # 初始化观测空间
         observation = self.game.reset()
+        # 初始化动作action
         game_history.action_history.append(numpy.zeros(self.config.action_space))
+        # 将观测空间记录
         game_history.observation_history.append(observation)
+        # 记录初始奖励
         game_history.reward_history.append(0)
         game_history.to_play_history.append(self.game.to_play())
-
         done = False
-
-        if render:
+        if render:  # 是否启动渲染
             self.game.render()
-
         with torch.no_grad():
             while (
                 not done and len(game_history.action_history) <= self.config.max_moves
@@ -136,18 +151,20 @@ class SelfPlay:
                 assert (
                     numpy.array(observation).shape == self.config.observation_shape
                 ), f"Observation should match the observation_shape defined in MuZeroConfig. Expected {self.config.observation_shape} but got {numpy.array(observation).shape}."
+                # 堆叠过去的观测空间的信息，相当于让过程携带时序信息，测试后发现意义不大，调用过程会自动掠过
                 stacked_observations = game_history.get_stacked_observations(
                     -1, self.config.stacked_observations
                 )
-
                 # Choose the action
                 if opponent == "self" or muzero_player == self.game.to_play():
+                    # MCTS算法的核心启动入口
                     root, mcts_info = MCTS(self.config).run(
                         self.model,
                         stacked_observations,
                         self.game.to_play(),
                         render,
                     )
+                    # 根据MCTS算法的核心原理，返回一个规划好的action
                     action = self.select_action(
                         root,
                         temperature
@@ -165,16 +182,17 @@ class SelfPlay:
                     action, root = self.select_opponent_action(
                         opponent, stacked_observations
                     )
-
+                # 将MCTS算法规划好的action灌入环境
                 observation, reward, done = self.game.step(action.value)
 
-                if render:
+                if render:  # 是否启动渲染，训练过程默认关闭，会影响速度，测试过程和调试训练过程其实可以打开
                     # print(f"Played action: {self.game.action_to_string(action)}")
                     self.game.render()
-
+                # 存储root
                 game_history.store_search_statistics(root)
+                # 存储车辆状态信息，用于绘制验收文档提到的车辆的曲线
                 game_history.vehicle_history.append(copy.deepcopy(self.game.env.unwrapped.road.vehicles))
-                # Next batch
+                # 下一个batch用的奖励数值，观测空间和action数值
                 game_history.action_history.append(action.value)
                 game_history.observation_history.append(observation)
                 game_history.reward_history.append(reward)
@@ -221,6 +239,7 @@ class SelfPlay:
     @staticmethod
     def select_action(node, temperature):
         """
+        根据温度参数返回action
         Select action according to the visit count distribution and the temperature.
         The temperature is changed dynamically with the visit_softmax_temperature function
         in the config.
@@ -281,16 +300,6 @@ class MCTS:
                 log_std,
                 hidden_state,
             ) = model.initial_inference(observation)
-            # if render:
-            #     print("input", observation)
-            #     print(
-            #         "root_predicted_value",
-            #         models.support_to_scalar(
-            #             root_predicted_value, self.config.support_size
-            #         ),
-            #     )
-            #     print("mu", mu)
-            #     print("sigma", log_std)
             root_predicted_value = models.support_to_scalar(
                 root_predicted_value, self.config.support_size
             ).item()
@@ -332,6 +341,7 @@ class MCTS:
                     parent.hidden_state.device
                 ),
             )
+            # 最影响规划速度的性能瓶颈，已经完成定位在这个位置接下来的两行，和模型结构整体深度相关，但是在配置合适的显卡上，勉强可以对冲这个影响
             value = models.support_to_scalar(value, self.config.support_size).item()
             reward = models.support_to_scalar(reward, self.config.support_size).item()
             node.expand(
@@ -538,6 +548,9 @@ class GameHistory:
 
     def get_stacked_observations(self, index, num_stacked_observations):
         """
+        如果要在训练过程堆叠过去的观测空间，要修改这里，
+        这里的设计一开始就不是给连续型动作空间用的，这里真的要启用也要大改，没必要，
+        之前测试过对性能提升也不大，瓶颈不在这里
         Generate a new observation with the observation at the index position
         and num_stacked_observations past observations and actions stacked.
         """

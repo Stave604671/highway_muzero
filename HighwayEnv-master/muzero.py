@@ -38,7 +38,7 @@ class MuZero:
     """
 
     def __init__(self, game_name, config=None, split_resources_in=1):
-        # Load the game and the config from the module with the game name
+        # 从games路径下读取配置信息
         try:
             game_module = importlib.import_module("games." + game_name)
             self.Game = game_module.Game
@@ -62,11 +62,11 @@ class MuZero:
             else:
                 self.config = config
 
-        # Fix random generator seed
+        # 固定随机数种子
         numpy.random.seed(self.config.seed)
         torch.manual_seed(self.config.seed)
 
-        # Manage GPUs
+        # 管理GPU配置数额，方便多卡训练
         if self.config.max_num_gpus == 0 and (
             self.config.selfplay_on_gpu
             or self.config.train_on_gpu
@@ -90,9 +90,8 @@ class MuZero:
         self.num_gpus = total_gpus / split_resources_in
         if 1 < self.num_gpus:
             self.num_gpus = math.floor(self.num_gpus)
-
+        # 初始化ray环境，这里可以限制代码可以使用的最大gpus和最大显存，不过有训练资源其实用不上
         ray.init(num_gpus=total_gpus, ignore_reinit_error=True)
-
         # Checkpoint and replay buffer used to initialize workers
         self.checkpoint = {
             "weights": None,
@@ -115,7 +114,6 @@ class MuZero:
             "terminate": False,
         }
         self.replay_buffer = {}
-
         cpu_actor = CPUActor.remote()
         cpu_weights = cpu_actor.get_initial_weights.remote(self.config)
         self.checkpoint["weights"], self.summary = copy.deepcopy(ray.get(cpu_weights))
@@ -138,7 +136,7 @@ class MuZero:
         if log_in_tensorboard or self.config.save_model:
             self.config.results_path.mkdir(parents=True, exist_ok=True)
 
-        # Manage GPUs
+        # 给训练的线程分配GPU
         if 0 < self.num_gpus:
             num_gpus_per_worker = self.num_gpus / (
                 self.config.train_on_gpu
@@ -151,28 +149,29 @@ class MuZero:
         else:
             num_gpus_per_worker = 0
 
-        # Initialize workers
+        # 初始化多线程工作过程的每个线程
         self.training_worker = trainer.Trainer.options(
             num_cpus=0,
             num_gpus=num_gpus_per_worker if self.config.train_on_gpu else 0,
         ).remote(self.checkpoint, self.config)
-
+        # 初始化一个缓存空间对象
         self.shared_storage_worker = shared_storage.SharedStorage.remote(
             self.checkpoint,
             self.config,
         )
+        # 记录是否停止训练
         self.shared_storage_worker.set_info.remote("terminate", False)
-
+        # 缓存空间管理信息初始化
         self.replay_buffer_worker = replay_buffer.ReplayBuffer.remote(
             self.checkpoint, self.replay_buffer, self.config
         )
-
+        # 是否使用最新的模型数值
         if self.config.use_last_model_value:
             self.reanalyse_worker = replay_buffer.Reanalyse.options(
                 num_cpus=0,
                 num_gpus=num_gpus_per_worker if self.config.reanalyse_on_gpu else 0,
             ).remote(self.checkpoint, self.config)
-
+        # 自我博弈过程的参数配置
         self.self_play_workers = [
             self_play.SelfPlay.options(
                 num_cpus=0,
@@ -186,13 +185,14 @@ class MuZero:
             for seed in range(self.config.num_workers)
         ]
 
-        # Launch workers
+        # 启动多线程开始自我博弈，往self.shared_storage_worker, self.replay_buffer_worker更新数据
         [
             self_play_worker.continuous_self_play.remote(
                 self.shared_storage_worker, self.replay_buffer_worker
             )
             for self_play_worker in self.self_play_workers
         ]
+        # 训练的线程持续从replay_buffer_worker和共享空间读取数据更新权重
         self.training_worker.continuous_update_weights.remote(
             self.replay_buffer_worker, self.shared_storage_worker
         )
@@ -200,7 +200,7 @@ class MuZero:
             self.reanalyse_worker.reanalyse.remote(
                 self.replay_buffer_worker, self.shared_storage_worker
             )
-
+        # 使用tensorboard记录日志
         if log_in_tensorboard:
             self.logging_loop(
                 num_gpus_per_worker if self.config.selfplay_on_gpu else 0,
@@ -210,7 +210,7 @@ class MuZero:
         """
         Keep track of the training performance.
         """
-        # Launch the test worker to get performance metrics
+        # 日志记录的时候单独启用一个测试的workers进行一次测试
         self.test_worker = self_play.SelfPlay.options(
             num_cpus=0,
             num_gpus=num_gpus,
@@ -587,20 +587,6 @@ if __name__ == "__main__":
                     observation, reward, done = env.step(action)
                     print(f"\nAction: {env.action_to_string(action)}\nReward: {reward}")
                     env.render()
-            # elif choice == 5:
-            #     # Define here the parameters to tune
-            #     # Parametrization documentation: https://facebookresearch.github.io/nevergrad/parametrization.html
-            #     muzero.terminate_workers()
-            #     del muzero
-            #     budget = 20
-            #     parallel_experiments = 2
-            #     lr_init = nevergrad.p.Log(lower=0.0001, upper=0.1)
-            #     discount = nevergrad.p.Log(lower=0.95, upper=0.9999)
-            #     parametrization = nevergrad.p.Dict(lr_init=lr_init, discount=discount)
-            #     best_hyperparameters = hyperparameter_search(
-            #         game_name, parametrization, budget, parallel_experiments, 20
-            #     )
-            #     muzero = MuZero(game_name, best_hyperparameters)
             else:
                 break
             print("\nDone")

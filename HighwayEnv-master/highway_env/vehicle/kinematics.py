@@ -20,6 +20,13 @@ class PIDController:
         self.integral = 0
 
     def update(self, target_heading: float, current_heading: float, dt: float) -> float:
+        """
+        pid控制器用于让当前的加速度或者转向角与目标接近
+        :param target_heading: 目标的加速度或者转向角
+        :param current_heading: 当前的加速度或转向角
+        :param dt: 环境的运行时间
+        :return:
+        """
         if dt <= 0:
             raise ValueError("dt must be greater than zero")
 
@@ -38,13 +45,13 @@ class PIDController:
 
 
 def normalize_angle(angle):
-    """Normalize an angle to the range [-pi, pi]."""
+    """将角度正则化Normalize an angle to the range [-pi, pi]."""
     return math.atan2(math.sin(angle), math.cos(angle))
 
 
 class DynamicReferencePath:
     def __init__(self, length=10, num_points=100, lane_width=4, safety_distance=2.5):
-        self.length = length  # 参考路径的长度
+        self.length = length  # LQR生成参考路径的长度
         self.num_points = num_points  # 参考路径的点数
         self.lane_width = lane_width  # 车道宽度
         self.safety_distance = safety_distance  # 安全距离
@@ -73,6 +80,7 @@ class DynamicReferencePath:
 
     def calc_track_error(self, x, y):
         """Calculate tracking error.
+        根据当前的车辆坐标和LQR的规划坐标，计算轨迹误差
 
         Args:
             x (float): Current vehicle position x.
@@ -145,20 +153,20 @@ class Vehicle(RoadObject):
     The vehicle is represented by a dynamical system: a modified bicycle model.
     It is state is propagated depending on its steering and acceleration actions.
     """
-
+    """ Vehicle length车长 [m] """
     LENGTH = 5.0
-    """ Vehicle length [m] """
+    """ Vehicle width 车宽 [m] """
     WIDTH = 2.0
-    """ Vehicle width [m] """
     L = 2.0
-    DEFAULT_INITIAL_SPEEDS = [20, 25]  # 论文要求的初始车速
     """ Range for random initial speeds [m/s] """
-    MAX_SPEED = 30.0
+    DEFAULT_INITIAL_SPEEDS = [20, 25]  # 论文要求的初始车速
     """ Maximum reachable speed [m/s] """
-    MIN_SPEED = 20.0
+    MAX_SPEED = 30.0
     """ Minimum reachable speed [m/s] """
+    MIN_SPEED = 20.0
+    # 存储的历史痕迹的长度
     HISTORY_SIZE = 30
-    """ Length of the vehicle state history, for trajectory display"""
+    """ 限制最大转向角和最大加速度 """
     MAX_STEERING_CHANGE = 0.01
     MAX_ACC_CHANGE = 0.01
 
@@ -196,6 +204,7 @@ class Vehicle(RoadObject):
         self.acceleration1 = 0.0
         self.previous_acceleration = 0.0  # 前一时刻的加速度
         self.jerk = 0.0  # 当前加加速度
+        # PID控制器的初始化参数
         self.pid_controller_acceleration = pid_acceleration if pid_acceleration else PIDController(0.5, 0.1, 0.4)
         self.dy_ref_path = DynamicReferencePath()
         self.lqr_controller = LQRController()
@@ -212,6 +221,7 @@ class Vehicle(RoadObject):
             is_observed: bool = False
     ) -> Vehicle:
         """
+        在道路上创建一个随机车辆
         Create a random vehicle on the road.
 
         The lane and /or speed are chosen randomly, while longitudinal position is chosen behind the last
@@ -261,6 +271,7 @@ class Vehicle(RoadObject):
     @classmethod
     def create_from(cls, vehicle: Vehicle) -> Vehicle:
         """
+        根据现有的车辆创建一个新的车辆
         Create a new vehicle from an existing one.
 
         Only the vehicle dynamics are copied, other properties are default.
@@ -275,6 +286,7 @@ class Vehicle(RoadObject):
 
     def act(self, action: dict | str = None) -> None:
         """
+        将当前环境产生的action动作存储到当前车辆对象的action属性中
         Store an action to be repeated.
 
         :param action: the input action
@@ -283,6 +295,7 @@ class Vehicle(RoadObject):
             self.action = action
 
     def get_nearby_obstacles(self, distance_threshold: float = LENGTH) -> list[RoadObject]:
+        # 获取临近车辆
         nearby_obstacles = []  # 将当前车辆的位置 self.position 转换为一个 NumPy 数组，确保后续可以进行矢量运算。self.position 应该是当前车辆在道路上的二维坐标。
         # 观测车辆的坐标
         self_pos = np.array(self.position)  # 确保是 numpy 数组
@@ -303,14 +316,28 @@ class Vehicle(RoadObject):
         return nearby_obstacles
 
     def lqr_compute(self, dt, steering):
+        """
+        计算LQR规划结果
+        :param dt: 环境运行时间
+        :param steering: 输入转向角
+        :return: LQR规划的转向角
+        """
+        # 初始化车辆状态
         robot_state = np.zeros(4)
+        # 存储观测车辆x轴坐标
         robot_state[0] = self.position[0]
+        # 存储观测车辆y轴坐标
         robot_state[1] = self.position[1]
+        # 存储观测车辆转向角
         robot_state[2] = steering
+        # 存储观测车辆速度
         robot_state[3] = self.speed
+        # 生成规划路径
         self.dy_ref_path.generate_path(self.road.vehicles)
+        # 计算当前路径和规划路径的偏差
         e, k, ref_yaw, s0 = self.dy_ref_path.calc_track_error(
             robot_state[0], robot_state[1])
+        # 根据LQR的公式配置初始化参数，参考了另一个工程实现
         ref_delta = math.atan2(self.L * k, 1)
         A = np.matrix([
             [1.0, 0.0, -self.speed * dt * math.sin(ref_yaw)],
@@ -323,8 +350,9 @@ class Vehicle(RoadObject):
             [dt * math.tan(ref_delta) / self.L, self.speed * dt /
              (self.L * math.cos(ref_delta) * math.cos(ref_delta))]
         ])
-
+        # 获取偏差数值
         x = robot_state[0:3] - self.dy_ref_path.refer_path[s0, 0:3]
+        # 获取LQR规划的转向角
         delta = self.lqr_controller.compute_control(x, A, B)
         return delta + ref_delta
 
@@ -332,16 +360,24 @@ class Vehicle(RoadObject):
         """
         Propagate the vehicle state given its actions.
         """
-        # 使用LQR平滑角度
+        # 先平滑外部输入的action
         self.clip_actions()
-
+        # 存储当前环境中更新的时间，模拟的车辆会在道路上行驶dt长度的时间
         self.dt = dt
+        # 存储历史action
         self.action_recent = copy.deepcopy(self.action)
+        # 存储历史坐标
         self.position_recent = copy.deepcopy(self.position)
+        # 存储历史速度
         self.speed_recent = copy.deepcopy(self.speed)
+        # 存储历史车头朝向
         self.heading_recent = copy.deepcopy(self.heading)
+        # 如果是观测车辆，仅仅对观测车辆应用控制器，因为观测车辆的底层全在这里，仅有的控制器就是clip_actions()
+        # 非观测车辆有自己的控制逻辑，
         if self.is_observed:
+            # 根据当前行驶时间和当前转向角，获取LQR的规划转向角
             steering_control = self.lqr_compute(dt, self.action['steering'])
+            # 限制转向角变化率不能超过一定幅度
             self.action["steering"] = np.clip(steering_control,
                                               self.action["steering"] - self.MAX_STEERING_CHANGE,
                                               self.action["steering"] + self.MAX_STEERING_CHANGE)
@@ -353,31 +389,33 @@ class Vehicle(RoadObject):
                 self.action_recent["acceleration"] - self.MAX_ACC_CHANGE,
                 self.action_recent["acceleration"] + self.MAX_ACC_CHANGE
             )
-            # ray.logger.info(f"前方存在障碍物。此时转向角:{self.action['steering']}")
+            # 返回前方是否有障碍
             obstacles = self.get_nearby_obstacles()
             # if not obstacles:
             #     self.action["steering"] = 0
             #     self.action_recent["steering"] = 0
             # else:
             #     self.action["steering"] = 0
-        else:
+        else:  # 非观测车辆保持直线，能简化车辆训练环境
             self.action['steering'] = 0
         delta_f = self.action["steering"]
         beta = np.arctan(1 / 2 * np.tan(delta_f))
         v = self.speed * np.array([np.cos(self.heading + beta), np.sin(self.heading + beta)])
         self.position += v * dt
-        # 不使用控制器获取车辆更新后的坐标
+        # 不使用控制器的前提下，获取车辆更新后的坐标，用于计算纵向和横向的规划偏差
         beta1 = np.arctan(1 / 2 * np.tan(self.action_recent["steering"]))
         v = self.speed_recent * np.array([np.cos(self.heading_recent + beta1),
                                           np.sin(self.heading_recent + beta1)])
         self.new_position = copy.deepcopy(self.position_recent)
         self.new_position += v * dt
-
+        # 判断是否碰撞
         if self.impact is not None:
             self.position += self.impact
             self.crashed = True
             self.impact = None
+        # 更新车头朝向
         self.heading += self.speed * np.sin(beta) / (self.LENGTH / 2) * dt
+        # 更新当前速度
         self.speed += self.action["acceleration"] * dt
         # 处理换道逻辑
         # 更新车辆的朝向
@@ -397,12 +435,13 @@ class Vehicle(RoadObject):
             # # 检查是否需要更改车道
             if new_lane_index[2] != self.lane_index[2] and not self.is_changing_lane:
                 # 设置换道目标位置
-                self.target_lane_center_y = (new_lane_index[2] + 0.5) * 4 - 2  # 车道宽度为4
-                self.target_heading = self.lane.heading_at(self.position[0])  # 目标车道的航向
+                # 车道宽度为4，使用这个代码可以根据车道索引获取该车道中心点的y坐标
+                self.target_lane_center_y = (new_lane_index[2] + 0.5) * 4 - 2
+                # 目标车道的航向
+                self.target_heading = self.lane.heading_at(self.position[0])
                 self.is_changing_lane = True  # 标记正在换道
                 self.lane_index = new_lane_index
                 self.lane = self.road.network.get_lane(self.lane_index)
-            #
             # # 换道过程平滑处理
             if self.is_changing_lane:
                 # 逐步调整位置和车头方向
@@ -444,6 +483,10 @@ class Vehicle(RoadObject):
 
     @property
     def velocity(self) -> np.ndarray:
+        """
+        获取带方向的速度
+        :return:
+        """
         return self.speed * self.direction  # TODO: slip angle beta should be used here
 
     @property
@@ -481,6 +524,12 @@ class Vehicle(RoadObject):
     def to_dict(
             self, origin_vehicle: Vehicle = None, observe_intentions: bool = True
     ) -> dict:
+        """
+        打印当前车辆状态
+        :param origin_vehicle:
+        :param observe_intentions:
+        :return:
+        """
         d = {
             "presence": 1,
             "x": self.position[0],
@@ -585,9 +634,9 @@ class Vehicle(RoadObject):
             self.action["acceleration"] = -1.0 * self.speed
         self.action["steering"] = float(self.action["steering"])
         self.action["acceleration"] = float(self.action["acceleration"])
-        if self.lane_index[2] == 3 and self.action['steering'] > 0:  # 避免向左转，保持直行或向右
+        if self.lane_index[2] == 3 and self.action['steering'] > 0:  # 如果在边缘车道，避免向左转，保持直行或向右
             self.action['steering'] = - self.action['steering']
-        elif self.lane_index[2] == 0 and self.action['steering'] < 0:  # 避免向左转，保持直行或向右
+        elif self.lane_index[2] == 0 and self.action['steering'] < 0:  # 如果在边缘车道，避免向左转，保持直行或向右
             self.action['steering'] = -self.action['steering']
         if self.speed > self.MAX_SPEED:
             self.action["acceleration"] = min(
