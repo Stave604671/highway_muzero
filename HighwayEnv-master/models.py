@@ -1,6 +1,7 @@
 import math
 from abc import ABC, abstractmethod
 
+import ray
 import torch
 
 
@@ -99,7 +100,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         self.action_space_size = action_space_size
         self.log_std_clamp = log_std_clamp
         self.full_support_size = 2 * support_size + 1
-
+        # 表示网络，对观测空间进行降维，方便模型提取关键信息
         self.representation_network = torch.nn.DataParallel(
             mlp(
                 observation_shape[0]
@@ -111,7 +112,7 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
                 encoding_size,
             )
         )
-
+        # 动力网络的一部分，接收拼接的潜在状态和动作，并输出下一步的潜在状态 next_encoded_state。
         self.dynamics_encoded_state_network = torch.nn.DataParallel(
             mlp(
                 encoding_size + self.action_space_size,
@@ -119,10 +120,11 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
                 encoding_size,
             )
         )
+        # 基于 next_encoded_state 预测当前动作的即时奖励 reward的动力网络。
         self.dynamics_reward_network = torch.nn.DataParallel(
             mlp(encoding_size, fc_reward_layers, self.full_support_size)
         )
-
+        # 输出动作的均值的策略网络
         self.prediction_policy_mu_network = torch.nn.DataParallel(
             mlp(
                 encoding_size,
@@ -131,24 +133,45 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
                 # output_activation=torch.nn.Tanh,
             )
         )
+        # 输出动作的标准差的对数的策略网络
         self.prediction_policy_logstd_network = torch.nn.DataParallel(
             mlp(encoding_size, fc_log_std_policy_layers, self.action_space_size)
         )
+        # 价值网络
         self.prediction_value_network = torch.nn.DataParallel(
             mlp(encoding_size, fc_value_layers, self.full_support_size)
         )
 
     def prediction(self, encoded_state):
+        """
+        将 next_encoded_state 输入到价值网络和策略网络中：
+        价值网络输出 value，表示下一状态的估计价值。
+        策略网络输出 mu 和 log_std，用于定义下一状态的动作分布。
+        :param encoded_state: 表示网络返回的潜在状态
+        :return:
+        """
+        # 表示在当前状态下模型倾向选择的动作。
         mu = self.prediction_policy_mu_network(encoded_state)
+        # 动作分布的标准差的对数。控制动作的随机性，允许模型在不确定的状态下输出更具探索性的动作。
         log_std = self.prediction_policy_logstd_network(encoded_state)
         log_std = torch.clamp(log_std, *self.log_std_clamp)
+        # mu 和 log_std 被用于定义策略网络中的动作分布，MuZero 可以在不同情境下生成适应性强的动作，并灵活调整探索与利用的平衡。
+        # value返回当前状态的估计价值
         value = self.prediction_value_network(encoded_state)
         return mu, log_std, value
 
     def representation(self, observation):
+        """
+        对观测空间进行降维，提取关键特征
+        :param observation:
+        :return:
+        """
+        rep_input = observation.view(observation.shape[0], -1)
+        ray.logger.info(f"representation_network: {rep_input.shape}")
         encoded_state = self.representation_network(
             observation.view(observation.shape[0], -1)
         )
+        ray.logger.info(f"representation_network size{encoded_state.shape}")
         # Scale encoded state between [-1, 1]
         min_encoded_state = encoded_state.min(1, keepdim=True)[0]
         max_encoded_state = encoded_state.max(1, keepdim=True)[0]
@@ -161,13 +184,23 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         return encoded_state_normalized
 
     def dynamics(self, encoded_state, action):
+        """
+        输入当前的 encoded_state 和 action，预测下一潜在状态 next_encoded_state
+        和奖励 reward。
+        :param encoded_state: 表示网络生成的潜在状态的向量，表示当前环境的内部特征
+        :param action: 当前采取的动作，通常是one-hot 编码的动作向量
+        :return:
+        """
         # Stack encoded_state with a game specific one hot encoded action (See paper appendix Network Architecture)
+        # 将当前的潜在状态 encoded_state 与动作 action 沿着特征维度拼接（dim=1），生成一个包含状态和动作信息的输入 x。
+        # 这种拼接操作可以帮助网络理解在当前状态下采取某一动作的效果
         x = torch.cat((encoded_state, action), dim=1)
-
+        # 接收拼接后的 x，并输出下一步的潜在状态 next_encoded_state。
         next_encoded_state = self.dynamics_encoded_state_network(x)
-
+        # 基于 next_encoded_state 预测当前动作的即时奖励 reward。
         reward = self.dynamics_reward_network(next_encoded_state)
-
+        # 对 next_encoded_state 进行标准化，以确保输出的潜在状态在一定的数值范围内，
+        # 这有助于提高模型的数值稳定性。
         # Scale encoded state between [0, 1] (See paper appendix Training)
         min_next_encoded_state = next_encoded_state.min(1, keepdim=True)[0]
         max_next_encoded_state = next_encoded_state.max(1, keepdim=True)[0]
@@ -177,13 +210,22 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         next_encoded_state_normalized = (
             next_encoded_state - mean_next_encoded_state
         ) / scale_next_encoded_state
-
+        # 返回下一潜在状态和奖励
         return next_encoded_state_normalized, reward
 
     def initial_inference(self, observation):
+        """
+        初始推理
+        :param observation:
+        :return:
+        """
+        # 通过表示网络 representation 将当前状态的观测空间转换为潜在表示 encoded_state。
         encoded_state = self.representation(observation)
+        # 调用 prediction，通过 encoded_state 输入到价值网络和策略网络中：
+        # 价值网络输出 value，表示初始状态的估计价值。
+        # 策略网络输出 mu 和 log_std，定义初始状态下的动作分布。
         mu, log_std, value = self.prediction(encoded_state)
-        # reward equal to 0 for consistency
+        # 通过固定逻辑生成一个奖励
         reward = torch.log(
             (
                 torch.zeros(1, self.full_support_size)
@@ -202,6 +244,12 @@ class MuZeroFullyConnectedNetwork(AbstractNetwork):
         )
 
     def recurrent_inference(self, encoded_state, action):
+        """
+        递归推理
+        :param encoded_state:
+        :param action:
+        :return:
+        """
         next_encoded_state, reward = self.dynamics(encoded_state, action)
         mu, log_std, value = self.prediction(next_encoded_state)
         return value, reward, mu, log_std, next_encoded_state

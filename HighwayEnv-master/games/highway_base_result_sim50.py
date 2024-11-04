@@ -16,33 +16,47 @@ class MuZeroConfig:
         self.max_num_gpus = None  # 固定使用gpu的最大数量.使用单个gpu会更快,没有配置的话会默认使用所有gpu
 
         # Game
-        self.observation_shape = (1, 30, 5)  # 游戏观测空间的维度,如果观测空间三维无所谓,如果是一维,需要配成(1,1,x)
-        self.action_space = 2  # 动作空间的大小
-        self.players = [i for i in range(1)]  # 玩家的数量,车辆换道场景观测和控制车辆只有一个,为1就行
-        self.stacked_observations = 0  # 观测时叠加的历史观察数量（包括过去的动作）。
+        # 游戏观测空间的维度,如果观测空间三维无所谓,如果是一维,需要配成(1,1,x),需要与下方环境中的观测空间的处理逻辑一致
+        self.observation_shape = (1, 30, 5)
+        # 动作空间的大小
+        self.action_space = 2
+        # 玩家的数量,车辆换道场景观测和控制车辆只有一个,为1就行
+        self.players = [i for i in range(1)]
+        # 观测时叠加的历史观察数量（包括过去的动作）。
+        self.stacked_observations = 0
 
-        # Evaluate
-        self.muzero_player = 0  # 用于区分多玩家环境中谁是 MuZero 控制的玩家。自我对弈默认是0.
-        self.opponent = None  # MuZero 面对的对手，用于评估在多人游戏中的进展。可以是 "random" 或 "expert"，如果在游戏类中实现了对手
+        # 用于区分多玩家环境中谁是 MuZero 控制的玩家。自我对弈默认是0.
+        self.muzero_player = 0
+        # MuZero 面对的对手，用于评估在多人游戏中的进展。可以是 "random" 或 "expert"，这里控制单个观测车辆用不到
+        self.opponent = None
 
         # Self-Play
-        self.num_workers = 12  # 定义了同时进行 Self-Play 的工作线程数量，这些线程负责生成训练样本并将其存储到回放缓冲区中。
-        self.selfplay_on_gpu = False  # 是否在gpu进行自我博弈,打开后速度变快,但是显存开支会高很多
-        self.max_moves = 500  # 每场游戏的最大游戏次数,未发生碰撞,或者没有达到这个次数,单场游戏都不停止
-        self.num_simulations = 50  # 执行指定次数的模拟，每次模拟从根节点开始进行搜索和更新,
-        self.discount = 0.997  # 长期回报的折扣因子
-        self.temperature_threshold = True  # 单次play_games的温度阈值,当前的play_games内,最大移动self.max_moves次,moves的次数超过这个阈值后,温度直接为0,低于这个次数时,启用visit_softmax_temperature_fn获取温度数值
+        # 同时进行 Self-Play 的工作线程数量，这些线程负责生成训练样本并将其存储到回放缓冲区中。
+        self.num_workers = 12
+        # 是否在gpu进行自我博弈,打开后速度变快,但是显存开支会高很多
+        self.selfplay_on_gpu = False
+        # 每场游戏的最大游戏次数,未发生碰撞,或者没有达到这个次数,单场游戏都不停止
+        self.max_moves = 500
+        # 执行指定次数的模拟，每次模拟从根节点开始进行搜索和更新,
+        self.num_simulations = 50
+        # 长期回报的折扣因子
+        self.discount = 0.997
+        # 通过True或False决定是否启用单次play_games的温度阈值,当前的play_games内,最大移动self.max_moves次,moves的次数超过这个阈值后,
+        # 温度直接为0,低于这个次数时,启用visit_softmax_temperature_fn获取温度数值
+        self.temperature_threshold = True
         # 'uniform' or 'density'
         self.node_prior = 'uniform'
 
         # UCB formula
-        self.pb_c_base = 19652  # 数值越大,更倾向于利用选择已知效果较好的动作,而非探索新动作
-        self.pb_c_init = 1.25  # 初始化参数,对探索奖励有一个固定的提升作用.数值越大,初期的探索越多.反之更依赖已知动作
+        # 数值越大,更倾向于利用选择已知效果较好的动作,而非探索新动作
+        self.pb_c_base = 19652
+        # 初始化参数,对探索奖励有一个固定的提升作用.数值越大,初期的探索越多.反之更依赖已知动作
+        self.pb_c_init = 1.25
 
-        # Progressive widening parameter
+        # 调节奖励结构，影响即时奖励与长远奖励的权重，平衡探索与利用，稳定训练过程，并最终提高模型的性能
         self.pw_alpha = 0.49
 
-        # network_config2
+        # 网络结构定义的部分
         self.network = "fullyconnected"
         self.log_std_clamp = (-20, 2)  # Clamp the standard deviation
         self.encoding_size = 10
@@ -68,38 +82,42 @@ class MuZeroConfig:
         self.batch_size = 512  # Number of parts of games to train on at each training step
         # 多少轮保存一次数据
         self.checkpoint_interval = 10  # Number of training steps before using the model for self-playing
+        # loss权重配置
         self.value_loss_weight = 2  # 缩放value loss避免过拟合,论文参数是0.25,直接给到五倍好了
         self.entropy_loss_weight = 1  # 缩放entropy_loss
         self.reward_loss_weight = 3
         self.policy_loss_weight = 2
+        # 训练过程是否启用gpu
         self.train_on_gpu = torch.cuda.is_available()  # Train on GPU if available
+        # 优化器配置
         self.optimizer = "AdamW"  # "Adam" or "SGD". Paper uses SGD
         self.weight_decay = 1e-4  # L2 weights regularization
-        self.momentum = 0.9  # Used only if optimizer is SGD
-
-        # Exponential learning rate schedule
+        self.momentum = 0.9  # 仅仅对SGD优化器生效的动量值
+        # 控制学习率衰减
         self.lr_init = 0.004  # Initial learning rate
         self.lr_decay_rate = 0.95  # Set it to 1 to use a constant learning rate
         self.lr_decay_steps = 1000
 
-        ### Replay Buffer
+        # 记忆池
         self.replay_buffer_size = int(1e6)  # 缓存空间中记录的自我监督的数据数量,给高了的话,容易引入噪声,如果给低了,性能不佳不稳定
-
-        self.num_unroll_steps = 30  # 每个批次中保留多少数量的moves的数据
-
+        # 每个批次中保留多少数量的moves的数据
+        self.num_unroll_steps = 30
+        # 计算目标值时，考虑未来多少步的奖励。
         self.td_steps = 75  # Number of steps in the future to take into account for calculating the target value
-
+        # 是否使用优先经验回放。作用：启用优先经验回放后，模型将优先选择那些对于当前网络最意外或最重要的经验进行训练，这可以加快学习速度并提高模型性能。
         self.PER = True  # Prioritized Replay (See paper appendix Training), select in priority the elements in the replay buffer which are unexpected for the network
+        # 控制经验优先级的程度，0 表示均匀选择，1 表示完全依赖于优先级。
         self.PER_alpha = 1.0  # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
-
+        # 是否使用上一个模型的值来提供更新后的 n 步值。
         # Reanalyze (See paper appendix Reanalyse)
         self.use_last_model_value = True  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
+        # 是否在 GPU 上进行重新分析。
         self.reanalyse_on_gpu = False   # windows下需要都打开，linux没限制
 
         ### Adjust the self play / training ratio to avoid over/underfitting
-        self.self_play_delay = 0.25  # Number of seconds to wait after each played game
-        self.training_delay = 0.75  # Number of seconds to wait after each training step
-        self.ratio = 0.75  # Desired training steps per self played step ratio. Equivalent to a synchronous version, training can take much longer. Set it to None to disable it
+        self.self_play_delay = 0.25  # 每次自我博弈后的等待时间，用于控制节奏缓解压力
+        self.training_delay = 0.75  # 每次训练结束后的等待时间，用于控制节奏，缓解硬件压力
+        self.ratio = 0.75  # 通过延时控制自我博弈和训练的比例
         # fmt: on
 
     def visit_softmax_temperature_fn(self, trained_steps):
@@ -128,24 +146,16 @@ class Game(AbstractGame):
                             config={  # 需要在程序启动这个观测器之前使用自定义的公式来对观测车辆的初始速度和初始位置进行初始化
                                 'observation': {"type": "Kinematics",  # 使用这个观测器作为状态空间，可以获取观测车辆位置、观测车辆速度和观测车辆转向角
                                                 "vehicles_count": 30,  # 20辆周围车辆
-                                                "features": ["presence", "x", "y", "vx", "vy"],
-                                                # "features_range": {
-                                                #     # "x": [-100, 100],
-                                                #     # "y": [-100, 100],
-                                                #     "vx": [-30, 30],
-                                                #     "vy": [-30, 30]
-                                                # },
-                                                # 控制状态空间包括转向角
+                                                "features": ["presence", "x", "y", "vx", "vy"], # 观测空间包括车辆五个维度的信息
                                                 "absolute": True,  # 使用相对坐标，相对于观测车辆。为True时使用相对于环境的全局坐标系。
                                                 "order": "sorted",
                                                 "normalize": True,# 根据与自车的距离从近到远排列。这种排列方式使得观测数组的顺序保持稳定
                                                 },
-                                # 'action': {'type': 'DiscreteMetaAction'},
-                                'action': {'type': 'ContinuousAction',
-                                           'acceleration_range': (-4, 4.0),
-                                           'steering_range': (-np.pi / 12, np.pi / 12)},  # 为它扩展一个能够控制横向加速度和纵向加速度的子类
-                                'simulation_frequency': 10,  # 模拟频率
-                                'policy_frequency': 10,  # 策略频率
+                                'action': {'type': 'ContinuousAction',  # 动作空间
+                                           'acceleration_range': (-4, 4.0),  # 动作空间的加速度限制
+                                           'steering_range': (-np.pi / 12, np.pi / 12)},  # 动作空间的转向角限制
+                                'simulation_frequency': 10,  # 环境刷新频率
+                                'policy_frequency': 10,  # 策略刷新频率
                                 # 纵向决策：IDM（智能驾驶模型）根据前车的距离和速度计算出加速度。
                                 'other_vehicles_type': 'highway_env.vehicle.behavior.IDMVehicle',
                                 'screen_width': 900,  # 屏幕宽度
@@ -188,11 +198,9 @@ class Game(AbstractGame):
         Returns:
             The new observation, the reward and a boolean if the game has ended.
         """
-        # logger.info(f"start step: {datetime.datetime.now()}")
-        # action = numpy.tanh(action)
+        # 将模型返回的action输入给环境
         observation, reward, done, _, _ = self.env.step(action)
-        # observation = observation.reshape((147,))
-        # logger.info(f"end step: {datetime.datetime.now()}")
+        # 将观测空间处理成模型可以接受的维度，需要与代码上方的self.observation_shape维度一致，所以这样做
         return numpy.array([observation]), reward, done
 
     def reset(self):
@@ -203,8 +211,7 @@ class Game(AbstractGame):
             Initial observation of the game.
         """
         observation, info = self.env.reset(seed=self.seed)
-
-        # Reshape the observation to 3D (1, 1, -1)
+        # 与step同理，处理成与代码上方的self.observation_shape维度一致
         observation = np.array(observation)
         observation = observation.reshape((1, 30, 5))
         # logger.info(f"Observation2 reset shape after step:{type(observation)}-shape-{observation.shape}")
@@ -212,7 +219,7 @@ class Game(AbstractGame):
 
     def render(self):
         """
-        Display the game observation.
+        是否启用可视化渲染
         """
         # logger.info(f"start render step: {datetime.datetime.now()}")
         self.env.render()
